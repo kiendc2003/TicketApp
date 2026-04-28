@@ -1,448 +1,188 @@
-import {
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  TextInput,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-
+import { usePosts } from "@/hooks/usePosts";
 import { useRouter } from "expo-router";
+import {
+  FlatList,
+  Platform,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
-import { Image } from "expo-image";
-import { Post, usePosts } from "@/hooks/usePosts";
-import { useAuth } from "@/context/AuthContext";
-import { formatTimeAgo, formatTimeRemaining } from "@/lib/date-helper";
 
-interface PostCardProps {
-  post: Post;
-  currentUserId?: string;
-}
-
-const PostCard = ({ post, currentUserId }: PostCardProps) => {
-  const postUser = post.profiles;
-  const isOwnPost = post.user_id === currentUserId;
-  return (
-    <View style={styles.postContainer}>
-      <View style={styles.postHeader}>
-        <View style={styles.userInfo}>
-          {postUser?.profile_image_url ? (
-            <Image
-              cachePolicy={"none"}
-              source={{ uri: postUser.profile_image_url }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarText}>
-                {postUser?.name?.[0]?.toUpperCase() || "U"}
-              </Text>
-            </View>
-          )}
-
-          <View>
-            <Text style={styles.username}>
-              {isOwnPost ? "You" : `@${postUser?.username}`}
-            </Text>
-            <Text style={styles.timeAgo}>{formatTimeAgo(post.created_at)}</Text>
-          </View>
-        </View>
-
-        {/* Post content */}
-        <View style={styles.timeRemainingBadge}>
-          <Text style={styles.timeRemainingText}>
-            {formatTimeRemaining(post.expires_at)}
-          </Text>
-        </View>
-      </View>
-
-      <Image
-        cachePolicy={"none"}
-        source={{ uri: post.image_url }}
-        style={styles.postImage}
-        contentFit="cover"
-      />
-
-      <View style={styles.postFooter}>
-        {post.description && (
-          <Text style={styles.postDescription}>{post.description}</Text>
-        )}
-        <Text style={styles.postInfo}>
-          {isOwnPost ? "Your Post" : `${postUser?.name}' post`} • Expires in{" "}
-          {formatTimeRemaining(post.expires_at)}
-        </Text>
-      </View>
-    </View>
-  );
-};
-
-export default function Index() {
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [description, setDescription] = useState<string>("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
+export default function Home() {
   const router = useRouter();
-  const { createPost, posts, refreshPosts } = usePosts();
-  const { user } = useAuth();
+  const { posts, isLoading, refetch } = usePosts();
 
-  // Check if user has an active post
-  const userActivePost = posts.find(
-    (post) =>
-      post.user_id === user?.id &&
-      post.is_active &&
-      new Date(post.expires_at) > new Date(),
-  );
+  const stats = [
+    {
+      label: "Open",
+      value: posts.filter((p) => p.status === "Open").length,
+      color: "#22c55e",
+    },
+    {
+      label: "Pending",
+      value: posts.filter((p) => p.status === "Pending").length,
+      color: "#f59e0b",
+    },
+    {
+      label: "Closed",
+      value: posts.filter((p) => p.status === "Closed").length,
+      color: "#9ca3af",
+    },
+  ];
 
-  const hasActivePost = !!userActivePost;
+  const recentTickets = posts.slice(0, 5);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await refreshPosts();
-    } catch (error) {
-      console.error("Error refreshing posts:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+return (
+  <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <FlatList
+      data={recentTickets}
+      keyExtractor={(item) => item.id.toString()}
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "We need camera roll permissions to select a profile image.",
-      );
-      return;
-    }
+      // Mobile pull to refresh
+      refreshing={isLoading}
+      onRefresh={refetch}
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setPreviewImage(result.assets[0].uri);
-      setShowPreview(true);
-      setDescription("");
-    }
-  };
+      ListHeaderComponent={
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 26, fontWeight: "bold" }}>
+            Hello 👋
+          </Text>
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "We need camera permissions to take a photo.",
-      );
-      return;
-    }
+          <Text style={{ color: "#666", marginBottom: 20 }}>
+            Here’s your support overview
+          </Text>
 
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setPreviewImage(result.assets[0].uri);
-      setShowPreview(true);
-      setDescription("");
-    }
-  };
-
-  const showImagePicker = () => {
-    Alert.alert("Select Profile Image", "Choose an option", [
-      { text: "Camera", onPress: takePhoto },
-      { text: "Photo Library", onPress: pickImage },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
-  const handlePost = async () => {
-    if (!previewImage) return;
-
-    setIsUploading(true);
-    try {
-      await createPost(previewImage, description);
-      setPreviewImage(null);
-      setDescription("");
-      setShowPreview(false);
-    } catch (error) {
-      console.error("Error creating post:", error);
-      Alert.alert("Error", "Failed to create post. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const renderPost = ({ item }: { item: Post }) => (
-    <PostCard post={item} currentUserId={user?.id} />
-  );
-
-  return (
-    <SafeAreaView style={styles.container} edges={["bottom", "top"]}>
-      {/* LIST */}
-      <FlatList
-        data={posts}
-        renderItem={renderPost}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={
-          posts.length === 0 ? styles.emptyContent : styles.content
-        }
-        ListEmptyComponent={<Text>No posts found</Text>}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
-
-      <TouchableOpacity style={styles.fab} onPress={showImagePicker}>
-        <Text style={styles.fabText}>{hasActivePost ? "↻" : "+"}</Text>
-      </TouchableOpacity>
-
-      <Modal visible={showPreview} transparent animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {" "}
-              {hasActivePost ? "Replace Your Post" : "Preview Your Post"}
-            </Text>
-            {previewImage && (
-              <Image
-                cachePolicy={"none"}
-                source={{ uri: previewImage }}
-                style={styles.previewImage}
-                contentFit="cover"
-              />
-            )}
-            <TextInput
-              style={styles.descriptionInput}
-              placeholder="Add a description (optional)"
-              placeholderTextColor="#999"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={500}
-              textAlignVertical="top"
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowPreview(false);
-                  setPreviewImage(null);
-                  setDescription("");
+          {/* 🔥 Web Refresh Button */}
+          {Platform.OS === "web" && (
+            <TouchableOpacity
+              onPress={refetch}
+              disabled={isLoading}
+              style={{
+                backgroundColor: isLoading ? "#9ca3af" : "#111827",
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 14,
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontWeight: "600",
+                  fontSize: 15,
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.postButton]}
-                onPress={handlePost}
-                disabled={isUploading}
+                {isLoading ? "⏳ Refreshing..." : "🔄 Refresh Data"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Stats */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 20,
+            }}
+          >
+            {stats.map((item, index) => (
+              <View
+                key={item.label}
+                style={{
+                  flex: 1,
+                  backgroundColor: "#f9fafb",
+                  padding: 16,
+                  borderRadius: 14,
+                  marginRight: index !== stats.length - 1 ? 8 : 0,
+                  alignItems: "center",
+                }}
               >
-                {isUploading ? (
-                  <ActivityIndicator size={24} color="#fff" />
-                ) : (
-                  <Text style={styles.postButtonText}>
-                    {hasActivePost ? "Replace" : "Post"}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: "bold",
+                    color: item.color,
+                  }}
+                >
+                  {item.value}
+                </Text>
+
+                <Text style={{ color: "#666" }}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
           </View>
+
+          {/* Quick Actions */}
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/create")}
+            style={{
+              backgroundColor: "#4f46e5",
+              padding: 16,
+              borderRadius: 14,
+              alignItems: "center",
+              marginBottom: 20,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+              + Create New Ticket
+            </Text>
+          </TouchableOpacity>
+
+          {/* Recent Tickets */}
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "600",
+              marginBottom: 10,
+            }}
+          >
+            Recent Tickets
+          </Text>
         </View>
-      </Modal>
-    </SafeAreaView>
-  );
+      }
+
+      renderItem={({ item }) => (
+        <View
+          style={{
+            marginHorizontal: 16,
+            backgroundColor: "#f5f5f5",
+            padding: 14,
+            borderRadius: 12,
+            marginBottom: 10,
+          }}
+        >
+          <Text style={{ fontWeight: "600" }}>
+            {item.title}
+          </Text>
+
+          <Text
+            style={{
+              color: "#666",
+              marginTop: 4,
+            }}
+          >
+            {item.description}
+          </Text>
+        </View>
+      )}
+
+      ListFooterComponent={
+        <View style={{ padding: 16 }}>
+          <Text
+            style={{
+              color: "#999",
+              textAlign: "center",
+            }}
+          >
+            {isLoading ? "Loading..." : "No more activity"}
+          </Text>
+        </View>
+      }
+    />
+  </SafeAreaView>
+);
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fab: {
-    position: "absolute",
-    bottom: 104,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabText: {
-    color: "#fff",
-    fontSize: 32,
-    fontWeight: "300",
-    lineHeight: 32,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  previewImage: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  descriptionInput: {
-    width: "100%",
-    minHeight: 80,
-    maxHeight: 120,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    color: "#000",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#f5f5f5",
-  },
-  cancelButtonText: {
-    color: "#000",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  postButton: {
-    backgroundColor: "#000",
-  },
-  postButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  content: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  emptyContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-
-  postContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  postHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  avatarPlaceholder: {
-    backgroundColor: "#f0f0f0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#666",
-  },
-  username: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-  },
-  timeAgo: {
-    fontSize: 12,
-    color: "#666",
-  },
-  timeRemainingBadge: {
-    backgroundColor: "#000",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  timeRemainingText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  postImage: {
-    width: "100%",
-    aspectRatio: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  postFooter: {
-    padding: 16,
-  },
-  postDescription: {
-    fontSize: 15,
-    color: "#000",
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  postInfo: {
-    fontSize: 14,
-    color: "#666",
-  },
-});

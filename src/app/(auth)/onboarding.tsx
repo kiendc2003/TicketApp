@@ -1,20 +1,21 @@
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase/client";
+import { uploadProfileImage } from "@/lib/supabase/storage";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  View
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Image } from "expo-image";
-import { supabase } from "@/lib/supabase/client";
-import { uploadProfileImage } from "@/lib/supabase/storage";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "expo-router";
 
 export default function SignUpScreen() {
   const [name, setName] = useState("");
@@ -66,11 +67,23 @@ export default function SignUpScreen() {
   };
 
   const showImagePicker = () => {
-    Alert.alert("Select Profile Image", "Choose an option", [
-      { text: "Camera", onPress: takePhoto },
-      { text: "Photo Library", onPress: pickImage },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    if (Platform.OS === "web") {
+      const useCamera = window.confirm(
+        "Press OK for Camera\nPress Cancel for Photo Library"
+      );
+  
+      if (useCamera) {
+        takePhoto();
+      } else {
+        pickImage();
+      }
+    } else {
+      Alert.alert("Select Profile Image", "Choose an option", [
+        { text: "Camera", onPress: takePhoto },
+        { text: "Photo Library", onPress: pickImage },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    }
   };
   const handleComplete = async () => {
     if (!name || !username) {

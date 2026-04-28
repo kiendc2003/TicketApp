@@ -1,18 +1,19 @@
 import { useAuth } from "@/context/AuthContext";
-import {
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { uploadProfileImage } from "@/lib/supabase/storage";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { uploadProfileImage } from "@/lib/supabase/storage";
-import { useState } from "react";
 import { useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Profile() {
   const { user, updateUser, signOut } = useAuth();
@@ -21,36 +22,55 @@ export default function Profile() {
 
   const handleUpdateProfileImage = async () => {
     if (!user) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  
+    const { status } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+  
     if (status !== "granted") {
       Alert.alert(
         "Permission needed",
-        "We need camera roll permissions to select a profile image.",
+        "We need permission to select image."
       );
       return;
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+  
+    const result =
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes:
+          ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+  
     if (!result.canceled && result.assets[0]) {
       setIsUpdating(true);
+  
       try {
-        const imageUrl = await uploadProfileImage(
-          user.id,
-          result.assets[0].uri,
+        const asset = result.assets[0];
+  
+        const imageUrl =
+          await uploadProfileImage(
+            Platform.OS === "web"
+              ? asset.file
+              : asset.uri,
+            user.id
+          );
+  
+        await updateUser({
+          profileImage: imageUrl,
+        });
+  
+        Alert.alert(
+          "Success",
+          "Profile image updated."
         );
-
-        await updateUser({ profileImage: imageUrl });
-        Alert.alert("Success", "Profile image updated.");
       } catch (error) {
-        console.error("Error updating profile image:", error);
+        console.error(error);
+  
         Alert.alert(
           "Error",
-          "Failed to update profile image. Please try again.",
+          "Failed to update image."
         );
       } finally {
         setIsUpdating(false);
@@ -59,20 +79,81 @@ export default function Profile() {
   };
 
   const handleSignOut = async () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          await signOut();
-          router.replace("/(auth)/login");
+    if (Platform.OS === "web") {
+      showLogoutModal();
+      return;
+    } else {
+      Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+        {
+          text: "Cancel",
+          style: "cancel",
         },
-      },
-    ]);
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            await signOut();
+            router.replace("/(auth)/login");
+          },
+        },
+      ]);
+    }
+  };
+
+  const showLogoutModal = () => {
+    const modal = document.createElement("div");
+  
+    modal.innerHTML = `
+      <div id="overlay" class="status-overlay">
+        <div class="status-modal">
+  
+          <div class="status-title">
+            Sign Out
+          </div>
+  
+          <p class="logout-text">
+            Are you sure you want to sign out?
+          </p>
+  
+          <button id="logoutBtn" class="status-btn closed">
+            🚪 Sign Out
+          </button>
+  
+          <button id="cancelBtn" class="status-btn cancel">
+            Cancel
+          </button>
+  
+        </div>
+      </div>
+    `;
+  
+    document.body.appendChild(modal);
+  
+    const remove = () => {
+      if (document.body.contains(modal)) {
+        document.body.removeChild(modal);
+      }
+    };
+  
+    modal
+      .querySelector("#logoutBtn")
+      ?.addEventListener("click", async () => {
+        remove();
+        await signOut();
+        router.replace("/(auth)/login");
+      });
+  
+    modal
+      .querySelector("#cancelBtn")
+      ?.addEventListener("click", remove);
+  
+    modal
+      .querySelector("#overlay")
+      ?.addEventListener("click", (e: any) => {
+        if (e.target.id === "overlay") {
+          remove();
+        }
+      });
   };
 
   return (
@@ -86,9 +167,15 @@ export default function Profile() {
             <View>
               {user?.profileImage ? (
                 <Image
-                  source={{ uri: user.profileImage }}
+                  source={{
+                    uri:
+                      Platform.OS === "web"
+                        ? `${user.profileImage}&t=${Date.now()}`
+                        : user.profileImage,
+                  }}
                   style={styles.profileImage}
-                  cachePolicy={"none"}
+                  cachePolicy="none"
+                  contentFit="cover"
                 />
               ) : (
                 <View

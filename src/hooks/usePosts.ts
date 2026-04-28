@@ -1,6 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
-import { uploadPostImage } from "@/lib/supabase/storage";
 import { useEffect, useState } from "react";
 
 export interface PostUser {
@@ -13,12 +12,12 @@ export interface PostUser {
 export interface Post {
   id: string;
   user_id: string;
-  image_url: string;
+  title: string;
   description?: string;
   created_at: string;
-  expires_at: string;
-  is_active: boolean;
   profiles?: PostUser;
+  status: string;
+  work_time?: string;
 }
 
 export const usePosts = () => {
@@ -28,40 +27,27 @@ export const usePosts = () => {
 
   useEffect(() => {
     loadPosts();
-  }, []);
+  }, [user]);
 
   const loadPosts = async () => {
     if (!user) return;
 
     setIsLoading(true);
     try {
-      const { data: postsData, error: postsError } = await supabase
-        .from("posts")
-        .select(
-          `
-            *,
-            profiles(id, name, username, profile_image_url)`,
-        )
-        .eq("is_active", true)
-        .gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false });
+      const { data: postsData, error } = await supabase
+      .from("posts")
+      .select(`
+        *,
+        profiles(id, name, username, profile_image_url)
+      `)
+      .order("created_at", { ascending: false });
 
-      if (postsError) {
-        console.error("Error loading posts:", postsError);
-        throw postsError;
-      }
-
-      if (!postsData || postsData.length === 0) {
-        setPosts([]);
-        return;
-      }
-
-      const postsWithProfiles = postsData.map((post) => ({
+      const formattedPosts = (postsData || []).map((post) => ({
         ...post,
         profiles: post.profiles || null,
       }));
 
-      setPosts(postsWithProfiles);
+      setPosts(formattedPosts);
     } catch (error) {
       console.error("Error in loadPosts:", error);
     } finally {
@@ -69,47 +55,26 @@ export const usePosts = () => {
     }
   };
 
-  const createPost = async (imageUri: string, description?: string) => {
+  const createPost = async (
+    title: string,
+    description?: string,
+    workTime?: string
+  ) => {
     if (!user) {
       throw new Error("User not authenticated");
     }
-
+  
     try {
-      // Deactivate any existing posts
-      const { error: deactivateError } = await supabase
-        .from("posts")
-        .update({ is_active: false })
-        .eq("user_id", user.id)
-        .eq("is_active", true);
-
-      if (deactivateError) {
-        console.error("Error deactivating old posts:", deactivateError);
-      }
-
-      const imageUrl = await uploadPostImage(user.id, imageUri);
-
-      // Calculate expiration time
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-      const { error } = await supabase
-        .from("posts")
-        .insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          description: description || null,
-          expires_at: expiresAt.toISOString(),
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Error creating post:", error);
-        throw error;
-      }
-
-      // Refresh posts
+      const { error } = await supabase.from("posts").insert({
+        user_id: user.id,
+        title,
+        description: description || null,
+        status: "Open",
+        work_time: workTime || null, // 🔥 thêm
+      });
+  
+      if (error) throw error;
+  
       await loadPosts();
     } catch (error) {
       console.error("Error in createPost:", error);
@@ -117,9 +82,27 @@ export const usePosts = () => {
     }
   };
 
-  const refreshPosts = async () => {
-    await loadPosts();
+  const updatePostStatus = async (postId: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("posts")
+        .update({ status })
+        .eq("id", postId);
+  
+      if (error) throw error;
+  
+      await loadPosts(); // reload lại list
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
   };
 
-  return { createPost, posts, refreshPosts };
+  return {
+    posts,
+    isLoading,
+    createPost,
+    loadPosts,
+    updatePostStatus,
+    refetch: loadPosts,
+  };
 };
