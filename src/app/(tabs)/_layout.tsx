@@ -79,89 +79,88 @@ function WebSidebar() {
     <View style={{ flex: 1, flexDirection: "row" }}>
       
       {/* SIDEBAR */}
-      <View
-        style={{
-          width: collapsed ? 80 : 240,
-          backgroundColor: "#111827",
-          paddingTop: 24,
-          paddingHorizontal: 12,
-        }}
-      >
-  
-        {/* LOGO */}
-        <Text
+      {!collapsed && (
+        <View
           style={{
-            color: "#fff",
-            fontSize: collapsed ? 20 : 24,
-            fontWeight: "bold",
-            marginBottom: 20,
-            textAlign: "center",
+            width: 240,
+            backgroundColor: "#111827",
+            paddingTop: 24,
+            paddingHorizontal: 12,
           }}
         >
-          {collapsed ? "🎫" : "Ticket App"}
-        </Text>
-  
-        {/* TOGGLE BUTTON */}
-        <TouchableOpacity
-          onPress={() => setCollapsed(!collapsed)}
-          style={{
-            backgroundColor: "#1f2937",
-            paddingVertical: 12,
-            borderRadius: 14,
-            alignItems: "center",
-            marginBottom: 24,
-            cursor: "pointer" as any,
-          }}
-        >
-          <Text
+          {/* HEADER SIDEBAR */}
+          <View
             style={{
-              color: "#fff",
-              fontSize: 18,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 24,
             }}
           >
-            {collapsed ? "➡️" : "⬅️"}
-          </Text>
-        </TouchableOpacity>
-  
-        {/* MENUS */}
-        {menus.map((item) => {
-          const active = pathname === item.href;
-  
-          return (
-            <Link
-              key={item.href}
-              href={item.href as any}
-              asChild
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 24,
+                fontWeight: "bold",
+              }}
             >
-              <TouchableOpacity
+              Ticket App
+            </Text>
+  
+            {/* CLOSE */}
+            <TouchableOpacity
+              onPress={() => setCollapsed(true)}
+              style={{
+                padding: 8,
+                borderRadius: 10,
+                backgroundColor: "#1f2937",
+                cursor: "pointer" as any,
+              }}
+            >
+              <Text
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: collapsed
-                    ? "center"
-                    : "flex-start",
-                  paddingVertical: 14,
-                  paddingHorizontal: 14,
-                  borderRadius: 14,
-                  marginBottom: 10,
-                  backgroundColor: active
-                    ? "#4f46e5"
-                    : "transparent",
-                  cursor: "pointer" as any,
+                  color: "#fff",
+                  fontSize: 22,
+                  fontWeight: "bold",
                 }}
               >
-                {/* ICON */}
-                <Text
+                ✕
+              </Text>
+            </TouchableOpacity>
+          </View>
+  
+          {/* MENUS */}
+          {menus.map((item) => {
+            const active = pathname === item.href;
+  
+            return (
+              <Link
+                key={item.href}
+                href={item.href as any}
+                asChild
+              >
+                <TouchableOpacity
                   style={{
-                    fontSize: 18,
-                    marginRight: collapsed ? 0 : 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 14,
+                    paddingHorizontal: 14,
+                    borderRadius: 14,
+                    marginBottom: 10,
+                    backgroundColor:
+                      active ? "#4f46e5" : "transparent",
+                    cursor: "pointer" as any,
                   }}
                 >
-                  {item.icon}
-                </Text>
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      marginRight: 12,
+                    }}
+                  >
+                    {item.icon}
+                  </Text>
   
-                {/* LABEL */}
-                {!collapsed && (
                   <Text
                     style={{
                       color: "#fff",
@@ -171,12 +170,12 @@ function WebSidebar() {
                   >
                     {item.name}
                   </Text>
-                )}
-              </TouchableOpacity>
-            </Link>
-          );
-        })}
-      </View>
+                </TouchableOpacity>
+              </Link>
+            );
+          })}
+        </View>
+      )}
   
       {/* PAGE */}
       <View
@@ -185,7 +184,42 @@ function WebSidebar() {
           backgroundColor: "#fff",
         }}
       >
-        <Slot />
+        {/* TOP BAR */}
+        {collapsed && (
+          <View
+            style={{
+              height: 60,
+              borderBottomWidth: 1,
+              borderBottomColor: "#eef0f2",
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 16,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setCollapsed(false)}
+              style={{
+                padding: 10,
+                borderRadius: 10,
+                backgroundColor: "#f3f4f6",
+                cursor: "pointer" as any,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "bold",
+                }}
+              >
+                ☰
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+  
+        <View style={{ flex: 1 }}>
+          <Slot />
+        </View>
       </View>
     </View>
   );
