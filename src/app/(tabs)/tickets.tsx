@@ -8,6 +8,7 @@ import {
   FlatList,
   Platform,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from "react-native";
@@ -31,6 +32,7 @@ export default function Tickets() {
   const [filter, setFilter] = useState("All");
   const [timeFilter, setTimeFilter] = useState("All Time");
   const {user} = useAuth();
+  const [search, setSearch] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -44,7 +46,6 @@ export default function Tickets() {
       : posts.filter((item) => item.status === filter);
 
   const getStatusColor = (status: string) => {
-    if (status === "Open") return "#22c55e";
     if (status === "Pending") return "#f59e0b";
     return "#9ca3af";
   };
@@ -75,6 +76,18 @@ export default function Tickets() {
       }
       return;
     }
+
+    if (item.status === "Closed") {
+      if (Platform.OS === "web") {
+        showClosedModal();
+      } else {
+        Alert.alert(
+          "Ticket Closed",
+          "Closed tickets cannot be updated."
+        );
+      }
+      return;
+    }
   
     const postId = item.id;
   
@@ -84,10 +97,6 @@ export default function Tickets() {
   
     } else {
       Alert.alert("Update Status", "Choose new status", [
-        {
-          text: "Open",
-          onPress: () => updatePostStatus(postId, "Open"),
-        },
         {
           text: "Pending",
           onPress: () => updatePostStatus(postId, "Pending"),
@@ -104,6 +113,50 @@ export default function Tickets() {
     }
   };
 
+  const showClosedModal = () => {
+    const modal = document.createElement("div");
+  
+    modal.innerHTML = `
+      <div id="overlay" class="status-overlay">
+        <div class="status-modal">
+  
+          <div class="status-title">
+            Ticket Closed
+          </div>
+  
+          <p class="logout-text">
+            Closed tickets cannot be updated.
+          </p>
+  
+          <button id="okBtn" class="status-btn closed">
+            OK
+          </button>
+  
+        </div>
+      </div>
+    `;
+  
+    document.body.appendChild(modal);
+  
+    const remove = () => {
+      if (document.body.contains(modal)) {
+        document.body.removeChild(modal);
+      }
+    };
+  
+    modal
+      .querySelector("#okBtn")
+      ?.addEventListener("click", remove);
+  
+    modal
+      .querySelector("#overlay")
+      ?.addEventListener("click", (e: any) => {
+        if (e.target.id === "overlay") {
+          remove();
+        }
+      });
+  };
+
   const showStatusModal = (postId: string) => {
     const modal = document.createElement("div");
   
@@ -114,10 +167,6 @@ export default function Tickets() {
           <div class="status-title">
             Update Status
           </div>
-  
-          <button id="openBtn" class="status-btn open">
-            🟢 Open
-          </button>
   
           <button id="pendingBtn" class="status-btn pending">
             🟠 Pending
@@ -142,13 +191,6 @@ export default function Tickets() {
         document.body.removeChild(modal);
       }
     };
-  
-    modal
-      .querySelector("#openBtn")
-      ?.addEventListener("click", () => {
-        updatePostStatus(postId, "Open");
-        remove();
-      });
   
     modal
       .querySelector("#pendingBtn")
@@ -243,7 +285,7 @@ export default function Tickets() {
             marginBottom: 12,
           }}
         >
-          {["All", "My Ticket", "Open", "Pending", "Closed"].map((item) => (
+          {["All", "My Ticket", "Pending", "Closed"].map((item) => (
             <TouchableOpacity
               key={item}
               onPress={() => setFilter(item)}
@@ -305,62 +347,93 @@ export default function Tickets() {
             )
           )}
         </View>
+
+        {/* SEARCH */}
+        <View style={{ marginBottom: 16 }}>
+          <TextInput
+            placeholder="🔍 Search ticket title..."
+            value={search}
+            onChangeText={setSearch}
+            style={{
+              backgroundColor: "#f9fafb",
+              borderWidth: 1,
+              borderColor: "#eef0f2",
+              borderRadius: 14,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              fontSize: 14,
+            }}
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
   
         {/* LIST */}
         {isLoading ? (
           <Text style={{ color: "#666" }}>Loading...</Text>
         ) : (
           <FlatList
-            data={posts
-              .filter((item) => {
-                // STATUS FILTER
-                if (filter === "My Ticket") {
-                  return item.user_id === user?.id;
-                }
-  
-                if (
-                  filter !== "All" &&
-                  filter !== "My Ticket"
-                ) {
-                  return item.status === filter;
-                }
-  
-                return true;
-              })
-              .filter((item) => {
-                const created = new Date(item.created_at);
-                const now = new Date();
-  
-                if (timeFilter === "Today") {
-                  return (
-                    created.toDateString() ===
-                    now.toDateString()
-                  );
-                }
-  
-                if (timeFilter === "This Week") {
-                  const start = new Date();
-                  start.setDate(now.getDate() - 7);
-                  return created >= start;
-                }
-  
-                if (timeFilter === "This Month") {
-                  return (
-                    created.getMonth() === now.getMonth() &&
-                    created.getFullYear() ===
-                      now.getFullYear()
-                  );
-                }
-  
-                if (timeFilter === "This Year") {
-                  return (
-                    created.getFullYear() ===
+          data={posts
+            // STATUS FILTER
+            .filter((item) => {
+              if (filter === "My Ticket") {
+                return item.user_id === user?.id;
+              }
+          
+              if (
+                filter !== "All" &&
+                filter !== "My Ticket"
+              ) {
+                return item.status === filter;
+              }
+          
+              return true;
+            })
+          
+            // TIME FILTER
+            .filter((item) => {
+              const created = new Date(item.created_at);
+              const now = new Date();
+          
+              if (timeFilter === "Today") {
+                return (
+                  created.toDateString() ===
+                  now.toDateString()
+                );
+              }
+          
+              if (timeFilter === "This Week") {
+                const start = new Date();
+                start.setDate(now.getDate() - 7);
+          
+                return created >= start;
+              }
+          
+              if (timeFilter === "This Month") {
+                return (
+                  created.getMonth() === now.getMonth() &&
+                  created.getFullYear() ===
                     now.getFullYear()
-                  );
-                }
-  
-                return true;
-              })}
+                );
+              }
+          
+              if (timeFilter === "This Year") {
+                return (
+                  created.getFullYear() ===
+                  now.getFullYear()
+                );
+              }
+          
+              return true;
+            })
+          
+            // SEARCH FILTER
+            .filter((item) => {
+              if (!search.trim()) return true;
+          
+              return item.title
+                ?.toLowerCase()
+                .includes(search.toLowerCase());
+            })}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 30 }}

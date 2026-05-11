@@ -14,11 +14,7 @@ export default function Home() {
   const { posts, isLoading, refetch } = usePosts();
 
   const stats = [
-    {
-      label: "Open",
-      value: posts.filter((p) => p.status === "Open").length,
-      color: "#22c55e",
-    },
+
     {
       label: "Pending",
       value: posts.filter((p) => p.status === "Pending").length,

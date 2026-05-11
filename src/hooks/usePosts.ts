@@ -69,7 +69,7 @@ export const usePosts = () => {
         user_id: user.id,
         title,
         description: description || null,
-        status: "Open",
+        status: "Pending",
         work_time: workTime || null, // 🔥 thêm
       });
   
