@@ -242,9 +242,6 @@ export default function Profile() {
           >
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.settingItem, styles.deleteButton]}>
-            <Text style={styles.deleteText}>Delete Account</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -346,16 +343,6 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     color: "#000",
-    fontWeight: "500",
-  },
-  deleteButton: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ff3b30",
-  },
-  deleteText: {
-    fontSize: 16,
-    color: "#ff3b30",
     fontWeight: "500",
   },
 });
