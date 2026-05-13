@@ -351,7 +351,7 @@ export default function Tickets() {
         {/* SEARCH */}
         <View style={{ marginBottom: 16 }}>
           <TextInput
-            placeholder="🔍 Search ticket title..."
+            placeholder="🔍 Search ticket title or user..."
             value={search}
             onChangeText={setSearch}
             style={{
@@ -429,10 +429,18 @@ export default function Tickets() {
             // SEARCH FILTER
             .filter((item) => {
               if (!search.trim()) return true;
-          
-              return item.title
+            
+              const keyword = search.toLowerCase();
+            
+              const titleMatch = item.title
                 ?.toLowerCase()
-                .includes(search.toLowerCase());
+                .includes(keyword);
+            
+              const userMatch = item.profiles?.name
+                ?.toLowerCase()
+                .includes(keyword);
+            
+              return titleMatch || userMatch;
             })}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}

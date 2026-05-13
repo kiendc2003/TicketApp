@@ -140,6 +140,7 @@ function WebSidebar() {
                 asChild
               >
                 <TouchableOpacity
+                  onPress={() => setCollapsed(true)}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
