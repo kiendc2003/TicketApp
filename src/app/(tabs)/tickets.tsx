@@ -33,6 +33,8 @@ export default function Tickets() {
   const [timeFilter, setTimeFilter] = useState("All Time");
   const {user} = useAuth();
   const [search, setSearch] = useState("");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -277,75 +279,188 @@ export default function Tickets() {
           Tickets
         </Text>
   
-        {/* STATUS FILTER */}
+        {/* FILTER ROW */}
         <View
           style={{
             flexDirection: "row",
-            flexWrap: "wrap",
-            marginBottom: 12,
+            gap: 10,
+            marginBottom: 18,
+            zIndex: 999,
           }}
         >
-          {["All", "My Ticket", "Pending", "Closed"].map((item) => (
+
+          {/* STATUS */}
+          <View style={{ position: "relative" }}>
             <TouchableOpacity
-              key={item}
-              onPress={() => setFilter(item)}
+              onPress={() => {
+                setShowStatusDropdown(
+                  !showStatusDropdown
+                );
+
+                setShowTimeDropdown(false);
+              }}
               style={{
-                paddingVertical: 8,
+                backgroundColor: "#f3f4f6",
+                paddingVertical: 10,
                 paddingHorizontal: 14,
-                backgroundColor:
-                  filter === item ? "#4f46e5" : "#f3f4f6",
-                borderRadius: 20,
-                marginRight: 8,
-                marginBottom: 8,
+                borderRadius: 12,
+                minWidth: 150,
               }}
             >
               <Text
                 style={{
-                  color: filter === item ? "#fff" : "#333",
-                  fontWeight: "500",
+                  fontWeight: "600",
+                  color: "#111827",
                 }}
               >
-                {item}
+                Status: {filter} ▼
               </Text>
             </TouchableOpacity>
-          ))}
-        </View>
-  
-        {/* TIME FILTER */}
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            marginBottom: 16,
-          }}
-        >
-          {["All Time", "Today", "This Week", "This Month", "This Year"].map(
-            (item) => (
-              <TouchableOpacity
-                key={item}
-                onPress={() => setTimeFilter(item)}
+
+            {/* DROPDOWN */}
+            {showStatusDropdown && (
+              <View
                 style={{
-                  paddingVertical: 7,
-                  paddingHorizontal: 12,
-                  backgroundColor:
-                    timeFilter === item ? "#111827" : "#f3f4f6",
-                  borderRadius: 20,
-                  marginRight: 8,
-                  marginBottom: 8,
+                  position: "absolute",
+                  top: 52,
+                  left: 0,
+                  width: 180,
+                  backgroundColor: "#fff",
+                  borderRadius: 14,
+                  paddingVertical: 8,
+                  borderWidth: 1,
+                  borderColor: "#e5e7eb",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.08,
+                  shadowRadius: 10,
+                  elevation: 5,
+                  zIndex: 9999,
                 }}
               >
-                <Text
-                  style={{
-                    color:
-                      timeFilter === item ? "#fff" : "#333",
-                    fontSize: 13,
-                  }}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+                {[
+                  "All",
+                  "My Ticket",
+                  "Pending",
+                  "Closed",
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    onPress={() => {
+                      setFilter(item);
+                      setShowStatusDropdown(false);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          filter === item
+                            ? "#4f46e5"
+                            : "#111827",
+
+                        fontWeight:
+                          filter === item
+                            ? "700"
+                            : "500",
+                      }}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* TIME */}
+          <View style={{ position: "relative" }}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowTimeDropdown(
+                  !showTimeDropdown
+                );
+
+                setShowStatusDropdown(false);
+              }}
+              style={{
+                backgroundColor: "#f3f4f6",
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 12,
+                minWidth: 170,
+              }}
+            >
+              <Text
+                style={{
+                  fontWeight: "600",
+                  color: "#111827",
+                }}
+              >
+                Time: {timeFilter} ▼
+              </Text>
+            </TouchableOpacity>
+
+            {/* DROPDOWN */}
+            {showTimeDropdown && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 52,
+                  left: 0,
+                  width: 200,
+                  backgroundColor: "#fff",
+                  borderRadius: 14,
+                  paddingVertical: 8,
+                  borderWidth: 1,
+                  borderColor: "#e5e7eb",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.08,
+                  shadowRadius: 10,
+                  elevation: 5,
+                  zIndex: 9999,
+                }}
+              >
+                {[
+                  "All Time",
+                  "Today",
+                  "This Week",
+                  "This Month",
+                  "This Year",
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    onPress={() => {
+                      setTimeFilter(item);
+                      setShowTimeDropdown(false);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          timeFilter === item
+                            ? "#4f46e5"
+                            : "#111827",
+
+                        fontWeight:
+                          timeFilter === item
+                            ? "700"
+                            : "500",
+                      }}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
         </View>
 
         {/* SEARCH */}
@@ -536,9 +651,30 @@ export default function Tickets() {
                 </View>
               </TouchableOpacity>
             )}
+
+            ListEmptyComponent={
+              <View
+                style={{
+                  paddingVertical: 40,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                  }}
+                >
+                  No tickets match your current filters.
+                </Text>
+              </View>
+            }
+
           />
         )}
       </View>
+
+
     </SafeAreaView>
   );
 }
