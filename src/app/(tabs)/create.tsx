@@ -1,48 +1,205 @@
 import { usePosts } from "@/hooks/usePosts";
 import "@/styles/datepicker.css";
+
+import { supabase } from "@/lib/supabase/client";
+
 import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { useRouter } from "expo-router";
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
+
 import DatePicker from "react-datepicker";
+
 import "react-datepicker/dist/react-datepicker.css";
+
 import {
   ActivityIndicator,
-  Alert, Modal, Platform, Text,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Create() {
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [workTime, setWorkTime] = useState<Date | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
+
+  const [description, setDescription] =
+    useState("");
+
+  const [isLoading, setIsLoading] =
+    useState(false);
+
+  const [workTime, setWorkTime] =
+    useState<Date | null>(null);
+
+  const [showPicker, setShowPicker] =
+    useState(false);
+
+  // REQUESTER
+  const [requester, setRequester] =
+    useState("");
+
+  const [requesters, setRequesters] =
+    useState<any[]>([]);
+
+  const [showRequesterBox, setShowRequesterBox] =
+    useState(false);
+
+  const [newRequester, setNewRequester] =
+    useState("");
+
+  const [searchRequester, setSearchRequester] =
+    useState("");
 
   const { createPost } = usePosts();
+
   const router = useRouter();
 
+  // LOAD REQUESTERS
+  useEffect(() => {
+    loadRequesters();
+  }, []);
+
+  const loadRequesters = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("requesters")
+        .select("*")
+        .order("total_request", {
+          ascending: false,
+        });
+
+      if (error) throw error;
+
+      setRequesters(data || []);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // CREATE OR UPDATE REQUESTER
+  const handleRequester = async () => {
+    if (!requester.trim()) return null;
+
+    try {
+      // CHECK EXIST
+      const { data: existing } =
+        await supabase
+          .from("requesters")
+          .select("*")
+          .eq("name", requester.trim())
+          .maybeSingle();
+
+      // EXISTED
+      if (existing) {
+        await supabase
+          .from("requesters")
+          .update({
+            total_request:
+              existing.total_request + 1,
+          })
+          .eq("id", existing.id);
+
+        return existing.id;
+      }
+
+      // CREATE NEW
+      const { data: created, error } =
+        await supabase
+          .from("requesters")
+          .insert({
+            name: requester.trim(),
+            total_request: 1,
+          })
+          .select()
+          .maybeSingle();
+
+      if (error) throw error;
+
+      return created?.id;
+    } catch (error: any) {
+      console.log(
+        "Requester Error:",
+        JSON.stringify(error, null, 2)
+      );
+    
+      Alert.alert(
+        "Requester Error",
+        JSON.stringify(error, null, 2)
+      );
+    
+      return null;
+    }
+  };
+
+  // SUBMIT
   const handleSubmit = async () => {
     if (!title.trim()) {
-      Alert.alert("Error", "Title is required");
+      Alert.alert(
+        "Error",
+        "Title is required"
+      );
+
       return;
     }
-  
+
+    if (!requester.trim()) {
+      Alert.alert(
+        "Error",
+        "Requester is required"
+      );
+
+      return;
+    }
+
     setIsLoading(true);
+
     try {
-      await createPost(title, description, workTime ? workTime.toISOString() : undefined); // ✅ tách riêng
-  
-      Alert.alert("Success", "Ticket created!");
-  
+      const requesterId =
+        await handleRequester();
+
+      await createPost(
+        title,
+        description,
+        workTime
+          ? workTime.toISOString()
+          : undefined,
+        requester,
+      );
+
+      Alert.alert(
+        "Success",
+        "Ticket created!"
+      );
+
       setTitle("");
+
       setDescription("");
-  
+
+      setRequester("");
+
+      setWorkTime(null);
+
+      loadRequesters();
+
       router.replace("/");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to create ticket");
+    } catch (error: any) {
+      console.error(
+        "Create Ticket Error:",
+        JSON.stringify(error, null, 2)
+      );
+    
+      Alert.alert(
+        "Error",
+        JSON.stringify(error, null, 2)
+      );
     } finally {
       setIsLoading(false);
     }
@@ -59,13 +216,30 @@ export default function Create() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      <View style={{ flex: 1, padding: 16 }}>
-        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+    <SafeAreaView
+      style={{
+        flex: 1,
+        backgroundColor: "#fff",
+      }}
+    >
+      <View
+        style={{
+          flex: 1,
+          padding: 16,
+        }}
+      >
+        {/* TITLE */}
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: "bold",
+            marginBottom: 16,
+          }}
+        >
           Create Ticket
         </Text>
 
-        {/* Title */}
+        {/* TITLE INPUT */}
         <TextInput
           placeholder="Title"
           value={title}
@@ -78,7 +252,7 @@ export default function Create() {
           }}
         />
 
-        {/* Description */}
+        {/* DESCRIPTION */}
         <TextInput
           placeholder="Description"
           value={description}
@@ -94,132 +268,182 @@ export default function Create() {
           }}
         />
 
-
-        {Platform.OS === "web" ? (
-        // ✅ Web
-        <View
-  style={{
-    marginBottom: 24,
-    zIndex: 9999,
-    position: "relative",
-  }}
->
-  {/* Card style picker */}
-  <View
-    style={{
-      backgroundColor: "#f9fafb",
-      borderRadius: 18,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: "#eef0f2",
-    }}
-  >
-    <Text
-      style={{
-        fontSize: 13,
-        color: "#6b7280",
-        marginBottom: 8,
-        fontWeight: "500",
-      }}
-    >
-      Support Completion Time
-    </Text>
-
-    
-      <DatePicker
-        selected={workTime}
-        onChange={(date: Date | null) =>
-          setWorkTime(date)
-        }
-        showTimeSelect
-        timeFormat="HH:mm"
-        timeIntervals={15}
-        dateFormat="dd/MM/yyyy HH:mm"
-        placeholderText="📅 Select date & time"
-        className="custom-datepicker"
-        withPortal
-      />
-
-    <Text
-      style={{
-        marginTop: 10,
-        fontSize: 12,
-        color: "#9ca3af",
-      }}
-    >
-      Choose the time you finished support.
-    </Text>
-  </View>
-</View>
-        ) : (
-        // ✅ Mobile
-        <>
-            {/* Button mở picker */}
-            <TouchableOpacity
-            onPress={() => setShowPicker(true)}
+        {/* REQUESTER */}
+        <TouchableOpacity
+          onPress={() =>
+            setShowRequesterBox(true)
+          }
+          style={{
+            backgroundColor: "#f5f5f5",
+            padding: 14,
+            borderRadius: 10,
+            marginBottom: 16,
+          }}
+        >
+          <Text
             style={{
+              color: requester
+                ? "#111827"
+                : "#9ca3af",
+            }}
+          >
+            {requester ||
+              "👤 Select requester"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* WEB */}
+        {Platform.OS === "web" ? (
+          <View
+            style={{
+              marginBottom: 24,
+              zIndex: 9999,
+              position: "relative",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: "#f9fafb",
+                borderRadius: 18,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: "#eef0f2",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: "#6b7280",
+                  marginBottom: 8,
+                  fontWeight: "500",
+                }}
+              >
+                Support Completion Time
+              </Text>
+
+              <DatePicker
+                selected={workTime}
+                onChange={(
+                  date: Date | null
+                ) => setWorkTime(date)}
+                showTimeSelect
+                timeFormat="HH:mm"
+                timeIntervals={15}
+                dateFormat="dd/MM/yyyy HH:mm"
+                placeholderText="📅 Select date & time"
+                className="custom-datepicker"
+                withPortal
+              />
+
+              <Text
+                style={{
+                  marginTop: 10,
+                  fontSize: 12,
+                  color: "#9ca3af",
+                }}
+              >
+                Choose the support time.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            {/* MOBILE PICKER BUTTON */}
+            <TouchableOpacity
+              onPress={() =>
+                setShowPicker(true)
+              }
+              style={{
                 backgroundColor: "#f5f5f5",
                 padding: 14,
                 borderRadius: 10,
                 marginBottom: 12,
-            }}
+              }}
             >
-            <Text style={{ color: workTime ? "#000" : "#9ca3af" }}>
-                {workTime ? formatDate(workTime) : "Chọn thời gian làm việc"}
-            </Text>
+              <Text
+                style={{
+                  color: workTime
+                    ? "#000"
+                    : "#9ca3af",
+                }}
+              >
+                {workTime
+                  ? formatDate(workTime)
+                  : "Select work time"}
+              </Text>
             </TouchableOpacity>
 
-            {/* Modal Picker */}
-            <Modal visible={showPicker} transparent animationType="slide">
-            <View
-                style={{
-                flex: 1,
-                justifyContent: "flex-end",
-                backgroundColor: "rgba(0,0,0,0.3)",
-                }}
+            {/* MOBILE PICKER */}
+            <Modal
+              visible={showPicker}
+              transparent
+              animationType="slide"
             >
-                <View
+              <View
                 style={{
+                  flex: 1,
+                  justifyContent: "flex-end",
+                  backgroundColor:
+                    "rgba(0,0,0,0.3)",
+                }}
+              >
+                <View
+                  style={{
                     backgroundColor: "#fff",
                     padding: 16,
                     borderTopLeftRadius: 20,
                     borderTopRightRadius: 20,
-                }}
+                  }}
                 >
-                {/* Picker */}
-                <DateTimePicker
-                    value={workTime || new Date()}
+                  <DateTimePicker
+                    value={
+                      workTime || new Date()
+                    }
                     mode="datetime"
                     display="spinner"
-                    style={{ height: 200 }}
-                    onChange={(event, selectedDate) => {
-                    if (selectedDate) {
-                        setWorkTime(selectedDate);
-                    }
-                    }}
-                />
-
-                {/* Done */}
-                <TouchableOpacity
-                    onPress={() => setShowPicker(false)}
                     style={{
-                    marginTop: 10,
-                    backgroundColor: "#4f46e5",
-                    padding: 12,
-                    borderRadius: 10,
-                    alignItems: "center",
+                      height: 200,
                     }}
-                >
-                    <Text style={{ color: "#fff" }}>Done</Text>
-                </TouchableOpacity>
+                    onChange={(
+                      event,
+                      selectedDate
+                    ) => {
+                      if (selectedDate) {
+                        setWorkTime(
+                          selectedDate
+                        );
+                      }
+                    }}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setShowPicker(false)
+                    }
+                    style={{
+                      marginTop: 10,
+                      backgroundColor:
+                        "#4f46e5",
+                      padding: 12,
+                      borderRadius: 10,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                      }}
+                    >
+                      Done
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-            </View>
+              </View>
             </Modal>
-        </>
+          </>
         )}
 
-        
-        {/* Submit */}
+        {/* SUBMIT */}
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={isLoading}
@@ -231,14 +455,222 @@ export default function Create() {
           }}
         >
           {isLoading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator
+              color="#fff"
+            />
           ) : (
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+            <Text
+              style={{
+                color: "#fff",
+                fontWeight: "bold",
+              }}
+            >
               Submit Ticket
             </Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* REQUESTER MODAL */}
+      <Modal
+        visible={showRequesterBox}
+        transparent
+        animationType="fade"
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor:
+              "rgba(0,0,0,0.2)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              backgroundColor: "#fff",
+              borderRadius: 20,
+              padding: 18,
+            }}
+          >
+            {/* TITLE */}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                marginBottom: 14,
+              }}
+            >
+              Select Requester
+            </Text>
+
+            {/* SEARCH */}
+            <TextInput
+              placeholder="Search requester..."
+              value={searchRequester}
+              onChangeText={
+                setSearchRequester
+              }
+              style={{
+                backgroundColor: "#f5f5f5",
+                padding: 12,
+                borderRadius: 10,
+                marginBottom: 12,
+              }}
+            />
+
+            {/* LIST */}
+            <FlatList
+              data={requesters.filter((item) =>
+                item.name
+                  ?.toLowerCase()
+                  .includes(
+                    searchRequester.toLowerCase()
+                  )
+              )}
+              keyExtractor={(item) =>
+                item.id
+              }
+              style={{
+                maxHeight: 220,
+              }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => {
+                    setRequester(
+                      item.name
+                    );
+
+                    setShowRequesterBox(
+                      false
+                    );
+
+                    setSearchRequester(
+                      ""
+                    );
+                  }}
+                  style={{
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor:
+                      "#f1f5f9",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {item.name}
+                  </Text>
+
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                    }}
+                  >
+                    {item.total_request}{" "}
+                    requests
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    textAlign: "center",
+                    marginVertical: 20,
+                  }}
+                >
+                  No requester found
+                </Text>
+              }
+            />
+
+            {/* ADD NEW */}
+            <View
+              style={{
+                marginTop: 16,
+              }}
+            >
+              <TextInput
+                placeholder="Add new requester..."
+                value={newRequester}
+                onChangeText={
+                  setNewRequester
+                }
+                style={{
+                  backgroundColor: "#f5f5f5",
+                  padding: 12,
+                  borderRadius: 10,
+                  marginBottom: 10,
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={() => {
+                  if (
+                    !newRequester.trim()
+                  )
+                    return;
+
+                  setRequester(
+                    newRequester.trim()
+                  );
+
+                  setNewRequester("");
+
+                  setShowRequesterBox(
+                    false
+                  );
+                }}
+                style={{
+                  backgroundColor:
+                    "#4f46e5",
+                  padding: 12,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "600",
+                  }}
+                >
+                  + Add New Requester
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setShowRequesterBox(
+                    false
+                  )
+                }
+                style={{
+                  alignItems: "center",
+                  padding: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#6b7280",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
