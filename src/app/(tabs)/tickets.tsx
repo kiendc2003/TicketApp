@@ -54,12 +54,29 @@ export default function Tickets() {
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  
+    const hours = date
+      .getHours()
+      .toString()
+      .padStart(2, "0");
+  
+    const minutes = date
+      .getMinutes()
+      .toString()
+      .padStart(2, "0");
+  
+    const day = date
+      .getDate()
+      .toString()
+      .padStart(2, "0");
+  
+    const month = (date.getMonth() + 1)
+      .toString()
+      .padStart(2, "0");
+  
+    const year = date.getFullYear();
+  
+    return `${hours}:${minutes} Ngày ${day} Tháng ${month} Năm ${year}`;
   };
 
   // 🔥 handle click ticket
@@ -583,27 +600,30 @@ export default function Tickets() {
                   👤 {item.profiles?.name || "Unknown"}
                 </Text>
   
-                {item.work_time && (
+                {/* TIME DISPLAY */}
+                {item.status === "Pending" ? (
                   <Text
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
-                      marginBottom: 4,
+                      color: "#9ca3af",
+                      marginBottom: 8,
                     }}
                   >
-                    🕒 Work: {formatTime(item.work_time)}
+                    📝 Created: {formatTime(item.created_at)}
                   </Text>
+                ) : (
+                  item.work_time && (
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: "#6b7280",
+                        marginBottom: 8,
+                      }}
+                    >
+                      ✅ Completed: {formatTime(item.work_time)}
+                    </Text>
+                  )
                 )}
-  
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: "#9ca3af",
-                    marginBottom: 8,
-                  }}
-                >
-                  📝 Created: {formatTime(item.created_at)}
-                </Text>
   
                 <Text
                   style={{

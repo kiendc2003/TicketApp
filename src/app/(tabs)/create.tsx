@@ -42,6 +42,10 @@ export default function Create() {
   const [showPicker, setShowPicker] =
     useState(false);
 
+  // COMPLETED
+  const [isCompleted, setIsCompleted] =
+    useState(false);
+
   // REQUESTER
   const [requester, setRequester] =
     useState("");
@@ -99,44 +103,37 @@ export default function Create() {
 
       // EXISTED
       if (existing) {
-        await supabase
-          .from("requesters")
-          .update({
-            total_request:
-              existing.total_request + 1,
-          })
-          .eq("id", existing.id);
-
         return existing.id;
       }
-
+      
       // CREATE NEW
       const { data: created, error } =
         await supabase
           .from("requesters")
           .insert({
             name: requester.trim(),
-            total_request: 1,
+            total_request: 0,
           })
           .select()
-          .maybeSingle();
-
+          .single();
+      
       if (error) throw error;
-
-      return created?.id;
-    } catch (error: any) {
-      console.log(
-        "Requester Error:",
-        JSON.stringify(error, null, 2)
-      );
-    
-      Alert.alert(
-        "Requester Error",
-        JSON.stringify(error, null, 2)
-      );
-    
-      return null;
-    }
+      
+      return created.id;
+      
+      } catch (error: any) {
+        console.log(
+          "Requester Error:",
+          JSON.stringify(error, null, 2)
+        );
+      
+        Alert.alert(
+          "Requester Error",
+          JSON.stringify(error, null, 2)
+        );
+      
+        return null;
+      }
   };
 
   // SUBMIT
@@ -159,36 +156,51 @@ export default function Create() {
       return;
     }
 
+    if (
+      isCompleted &&
+      !workTime
+    ) {
+      Alert.alert(
+        "Error",
+        "Please select completion time"
+      );
+
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const requesterId =
         await handleRequester();
-
+    
       await createPost(
         title,
         description,
-        workTime
+        isCompleted && workTime
           ? workTime.toISOString()
           : undefined,
         requester,
+        requesterId
       );
-
+    
       Alert.alert(
         "Success",
         "Ticket created!"
       );
-
+    
       setTitle("");
-
+    
       setDescription("");
-
+    
       setRequester("");
-
+    
       setWorkTime(null);
-
-      loadRequesters();
-
+    
+      setIsCompleted(false);
+    
+      await loadRequesters();
+    
       router.replace("/");
     } catch (error: any) {
       console.error(
@@ -204,7 +216,6 @@ export default function Create() {
       setIsLoading(false);
     }
   };
-
   const formatDate = (date: Date) => {
     return date.toLocaleString("vi-VN", {
       day: "2-digit",
@@ -292,154 +303,236 @@ export default function Create() {
           </Text>
         </TouchableOpacity>
 
-        {/* WEB */}
-        {Platform.OS === "web" ? (
+        {/* COMPLETED TOGGLE */}
+        <TouchableOpacity
+          onPress={() => {
+            setIsCompleted(
+              !isCompleted
+            );
+
+            if (isCompleted) {
+              setWorkTime(null);
+            }
+          }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
           <View
             style={{
-              marginBottom: 24,
-              zIndex: 9999,
-              position: "relative",
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              borderWidth: 2,
+              borderColor: isCompleted
+                ? "#4f46e5"
+                : "#cbd5e1",
+              backgroundColor:
+                isCompleted
+                  ? "#4f46e5"
+                  : "#fff",
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 10,
             }}
           >
-            <View
-              style={{
-                backgroundColor: "#f9fafb",
-                borderRadius: 18,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "#eef0f2",
-              }}
-            >
+            {isCompleted && (
               <Text
                 style={{
-                  fontSize: 13,
-                  color: "#6b7280",
-                  marginBottom: 8,
-                  fontWeight: "500",
-                }}
-              >
-                Support Completion Time
-              </Text>
-
-              <DatePicker
-                selected={workTime}
-                onChange={(
-                  date: Date | null
-                ) => setWorkTime(date)}
-                showTimeSelect
-                timeFormat="HH:mm"
-                timeIntervals={15}
-                dateFormat="dd/MM/yyyy HH:mm"
-                placeholderText="📅 Select date & time"
-                className="custom-datepicker"
-                withPortal
-              />
-
-              <Text
-                style={{
-                  marginTop: 10,
+                  color: "#fff",
+                  fontWeight: "700",
                   fontSize: 12,
-                  color: "#9ca3af",
                 }}
               >
-                Choose the support time.
+                ✓
               </Text>
-            </View>
+            )}
           </View>
-        ) : (
-          <>
-            {/* MOBILE PICKER BUTTON */}
-            <TouchableOpacity
-              onPress={() =>
-                setShowPicker(true)
-              }
-              style={{
-                backgroundColor: "#f5f5f5",
-                padding: 14,
-                borderRadius: 10,
-                marginBottom: 12,
-              }}
-            >
-              <Text
-                style={{
-                  color: workTime
-                    ? "#000"
-                    : "#9ca3af",
-                }}
-              >
-                {workTime
-                  ? formatDate(workTime)
-                  : "Select work time"}
-              </Text>
-            </TouchableOpacity>
 
-            {/* MOBILE PICKER */}
-            <Modal
-              visible={showPicker}
-              transparent
-              animationType="slide"
-            >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: "500",
+              color: "#111827",
+            }}
+          >
+            Mark as completed
+          </Text>
+        </TouchableOpacity>
+
+        {/* ONLY SHOW WHEN COMPLETED */}
+        {isCompleted && (
+          <>
+            {/* WEB */}
+            {Platform.OS === "web" ? (
               <View
                 style={{
-                  flex: 1,
-                  justifyContent: "flex-end",
-                  backgroundColor:
-                    "rgba(0,0,0,0.3)",
+                  marginBottom: 24,
+                  zIndex: 9999,
+                  position: "relative",
                 }}
               >
                 <View
                   style={{
-                    backgroundColor: "#fff",
+                    backgroundColor:
+                      "#f9fafb",
+                    borderRadius: 18,
                     padding: 16,
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
+                    borderWidth: 1,
+                    borderColor:
+                      "#eef0f2",
                   }}
                 >
-                  <DateTimePicker
-                    value={
-                      workTime || new Date()
-                    }
-                    mode="datetime"
-                    display="spinner"
+                  <Text
                     style={{
-                      height: 200,
-                    }}
-                    onChange={(
-                      event,
-                      selectedDate
-                    ) => {
-                      if (selectedDate) {
-                        setWorkTime(
-                          selectedDate
-                        );
-                      }
-                    }}
-                  />
-
-                  <TouchableOpacity
-                    onPress={() =>
-                      setShowPicker(false)
-                    }
-                    style={{
-                      marginTop: 10,
-                      backgroundColor:
-                        "#4f46e5",
-                      padding: 12,
-                      borderRadius: 10,
-                      alignItems: "center",
+                      fontSize: 13,
+                      color: "#6b7280",
+                      marginBottom: 8,
+                      fontWeight: "500",
                     }}
                   >
-                    <Text
-                      style={{
-                        color: "#fff",
-                      }}
-                    >
-                      Done
-                    </Text>
-                  </TouchableOpacity>
+                    Completion Time
+                  </Text>
+
+                  <DatePicker
+                    selected={workTime}
+                    onChange={(
+                      date: Date | null
+                    ) =>
+                      setWorkTime(date)
+                    }
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={15}
+                    dateFormat="dd/MM/yyyy HH:mm"
+                    placeholderText="📅 Select completion time"
+                    className="custom-datepicker"
+                    withPortal
+                  />
+
+                  <Text
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      color: "#9ca3af",
+                    }}
+                  >
+                    Ticket will
+                    automatically be
+                    closed.
+                  </Text>
                 </View>
               </View>
-            </Modal>
+            ) : (
+              <>
+                {/* MOBILE BUTTON */}
+                <TouchableOpacity
+                  onPress={() =>
+                    setShowPicker(true)
+                  }
+                  style={{
+                    backgroundColor:
+                      "#f5f5f5",
+                    padding: 14,
+                    borderRadius: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: workTime
+                        ? "#000"
+                        : "#9ca3af",
+                    }}
+                  >
+                    {workTime
+                      ? formatDate(
+                          workTime
+                        )
+                      : "Select completion time"}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* MOBILE PICKER */}
+                <Modal
+                  visible={showPicker}
+                  transparent
+                  animationType="slide"
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      justifyContent:
+                        "flex-end",
+                      backgroundColor:
+                        "rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    <View
+                      style={{
+                        backgroundColor:
+                          "#fff",
+                        padding: 16,
+                        borderTopLeftRadius: 20,
+                        borderTopRightRadius: 20,
+                      }}
+                    >
+                      <DateTimePicker
+                        value={
+                          workTime ||
+                          new Date()
+                        }
+                        mode="datetime"
+                        display="spinner"
+                        style={{
+                          height: 200,
+                        }}
+                        onChange={(
+                          event,
+                          selectedDate
+                        ) => {
+                          if (
+                            selectedDate
+                          ) {
+                            setWorkTime(
+                              selectedDate
+                            );
+                          }
+                        }}
+                      />
+
+                      <TouchableOpacity
+                        onPress={() =>
+                          setShowPicker(
+                            false
+                          )
+                        }
+                        style={{
+                          marginTop: 10,
+                          backgroundColor:
+                            "#4f46e5",
+                          padding: 12,
+                          borderRadius: 10,
+                          alignItems:
+                            "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              "#fff",
+                          }}
+                        >
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Modal>
+              </>
+            )}
           </>
         )}
 

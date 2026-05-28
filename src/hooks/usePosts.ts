@@ -124,47 +124,44 @@ export const usePosts = () => {
     try {
       const trimmed =
         requesterName.trim();
-
-      if (!trimmed) return;
-
+  
+      if (!trimmed) return null;
+  
       // CHECK EXIST
       const existing = requesters.find(
         (item) =>
           item.name.toLowerCase() ===
           trimmed.toLowerCase()
       );
-
-      // EXIST -> UPDATE totalRequest
+  
+      // EXIST
       if (existing) {
-        const { error } = await supabase
-          .from("requesters")
-          .update({
-            total_request:
-              existing.total_request + 1,
-          })
-          .eq("id", existing.id);
-
-        if (error) throw error;
+        return existing.id;
       }
-
-      // NEW -> INSERT
-      else {
-        const { error } = await supabase
+  
+      // NEW
+      const { data, error } =
+        await supabase
           .from("requesters")
           .insert({
             name: trimmed,
-            total_request: 1,
-          });
-
-        if (error) throw error;
-      }
-
+            total_request: 0,
+          })
+          .select()
+          .single();
+  
+      if (error) throw error;
+  
       await loadRequesters();
+  
+      return data.id;
     } catch (error) {
       console.error(
         "Error saving requester:",
         error
       );
+  
+      return null;
     }
   };
 
@@ -173,48 +170,49 @@ export const usePosts = () => {
     title: string,
     description?: string,
     workTime?: string,
-    requester?: string
+    requester?: string,
+    requesterId?: string
   ) => {
     if (!user) {
       throw new Error(
         "User not authenticated"
       );
     }
-
+  
     try {
-      // SAVE REQUESTER
-      if (requester?.trim()) {
-        await saveRequester(requester);
-      }
-
       const { error } = await supabase
         .from("posts")
         .insert({
           user_id: user.id,
-
+  
           title,
-
+  
           description:
             description || null,
-
-          status: "Pending",
-
+  
+          status: workTime
+            ? "Closed"
+            : "Pending",
+  
           work_time:
             workTime || null,
-
+  
           requester:
             requester || null,
+  
+          requester_id:
+            requesterId || null,
         });
-
+  
       if (error) throw error;
-
+  
       await loadPosts();
     } catch (error) {
       console.error(
         "Error in createPost:",
         error
       );
-
+  
       throw error;
     }
   };
@@ -228,7 +226,7 @@ export const usePosts = () => {
       const currentPost = posts.find(
         (item) => item.id === postId
       );
-
+  
       // BLOCK CLOSED -> PENDING
       if (
         currentPost?.status === "Closed" &&
@@ -236,14 +234,24 @@ export const usePosts = () => {
       ) {
         return;
       }
-
+  
+      const updateData: any = {
+        status,
+      };
+  
+      // 🔥 nếu close thì lấy thời gian hiện tại
+      if (status === "Closed") {
+        updateData.work_time =
+          new Date().toISOString();
+      }
+  
       const { error } = await supabase
         .from("posts")
-        .update({ status })
+        .update(updateData)
         .eq("id", postId);
-
+  
       if (error) throw error;
-
+  
       await loadPosts();
     } catch (error) {
       console.error(
