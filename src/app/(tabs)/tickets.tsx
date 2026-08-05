@@ -636,12 +636,13 @@ export default function Tickets() {
                 </Text>
   
                 <Text
-                  numberOfLines={2}
                   style={{
                     marginTop: 6,
                     fontSize: 14,
                     color: "#6b7280",
                     lineHeight: 20,
+                    flexWrap: "wrap",
+                    flexShrink: 1,
                   }}
                 >
                   {item.description}
