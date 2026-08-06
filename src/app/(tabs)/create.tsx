@@ -19,6 +19,7 @@ import {
   FlatList,
   Modal,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -62,6 +63,27 @@ export default function Create() {
   const [searchRequester, setSearchRequester] =
     useState("");
 
+  const [ticketType, setTicketType] = useState<
+    "Checklist" | "Other"
+  >("Other");
+
+  const [otherTasks, setOtherTasks] = useState<string[]>([]);
+
+  const [shift, setShift] = useState("");
+
+  const dailyTasks = [
+    "Màn hình LED (up quảng cáo mới)",
+    "Màn hình chỉ dẫn",
+    "Đếm người",
+    "Bãi xe (kiểm tra)",
+    "Bãi xe (lấy báo cáo hoá đơn, doanh thu)",
+    "Đầu ghi camera",
+    "Kiểm tra tình hình server, đường truyền, virus",
+  ];
+
+  const [checkedTasks, setCheckedTasks] =
+  useState<string[]>([]);
+
   const { createPost } = usePosts();
 
   const router = useRouter();
@@ -70,6 +92,20 @@ export default function Create() {
   useEffect(() => {
     loadRequesters();
   }, []);
+
+  const addOtherTask = () => {
+    setOtherTasks([...otherTasks, ""]);
+  };
+
+  const updateOtherTask = (index: number, value: string) => {
+    const temp = [...otherTasks];
+    temp[index] = value;
+    setOtherTasks(temp);
+  };
+
+  const removeOtherTask = (index: number) => {
+    setOtherTasks(otherTasks.filter((_, i) => i !== index));
+  };
 
   const loadRequesters = async () => {
     try {
@@ -139,23 +175,40 @@ export default function Create() {
   // SUBMIT
   const handleSubmit = async () => {
     if (!title.trim()) {
-      Alert.alert(
-        "Error",
-        "Title is required"
-      );
-
+      Alert.alert("Error", "Title is required");
       return;
     }
-
+  
     if (!requester.trim()) {
-      Alert.alert(
-        "Error",
-        "Requester is required"
-      );
-
+      Alert.alert("Error", "Requester is required");
       return;
     }
-
+  
+    // Checklist phải có ít nhất 1 mục
+    if (
+      ticketType === "Checklist" &&
+      checkedTasks.length === 0 &&
+      otherTasks.filter((item) => item.trim() !== "").length === 0
+    ) {
+      Alert.alert(
+        "Error",
+        "Please select at least one checklist item or add another task."
+      );
+      return;
+    }
+  
+    // Other phải nhập Description
+    if (
+      ticketType === "Other" &&
+      !description.trim()
+    ) {
+      Alert.alert(
+        "Error",
+        "Description is required."
+      );
+      return;
+    }
+  
     if (
       isCompleted &&
       !workTime
@@ -164,58 +217,85 @@ export default function Create() {
         "Error",
         "Please select completion time"
       );
-
       return;
     }
-
+  
     setIsLoading(true);
-
+  
     try {
       const requesterId =
         await handleRequester();
-    
+  
+      let finalDescription = description;
+  
+      if (ticketType === "Checklist") {
+        finalDescription = [
+          ...checkedTasks.map(
+            (item) => `• ${item}`
+          ),
+          ...otherTasks
+            .filter(
+              (item) => item.trim() !== ""
+            )
+            .map(
+              (item) => `📝 Note: ${item}`
+            ),
+        ].join("\n");
+      }
+  
       await createPost(
         title,
-        description,
+        finalDescription,
         isCompleted && workTime
           ? workTime.toISOString()
           : undefined,
         requester,
         requesterId
       );
-    
+  
       Alert.alert(
         "Success",
         "Ticket created!"
       );
-    
+  
+      // Reset form
       setTitle("");
-    
       setDescription("");
-    
       setRequester("");
-    
+      setShift("");
       setWorkTime(null);
-    
       setIsCompleted(false);
-    
+  
+      setTicketType("Other");
+      setCheckedTasks([]);
+      setOtherTasks([]);
+  
       await loadRequesters();
-    
+  
       router.replace("/");
     } catch (error: any) {
       console.error(
         "Create Ticket Error:",
-        JSON.stringify(error, null, 2)
+        JSON.stringify(
+          error,
+          null,
+          2
+        )
       );
-    
+  
       Alert.alert(
         "Error",
-        JSON.stringify(error, null, 2)
+        JSON.stringify(
+          error,
+          null,
+          2
+        )
       );
     } finally {
       setIsLoading(false);
     }
   };
+
   const formatDate = (date: Date) => {
     return date.toLocaleString("vi-VN", {
       day: "2-digit",
@@ -226,6 +306,14 @@ export default function Create() {
     });
   };
 
+  const toggleTask = (task: string) => {
+    setCheckedTasks((prev) =>
+      prev.includes(task)
+        ? prev.filter((i) => i !== task)
+        : [...prev, task]
+    );
+  };
+
   return (
     <SafeAreaView
       style={{
@@ -233,12 +321,14 @@ export default function Create() {
         backgroundColor: "#fff",
       }}
     >
-      <View
-        style={{
-          flex: 1,
-          padding: 16,
-        }}
-      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: 16,
+            paddingBottom: 40,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
         {/* TITLE */}
         <Text
           style={{
@@ -263,7 +353,235 @@ export default function Create() {
           }}
         />
 
+        {/* TICKET TYPE */}
+        <Text
+          style={{
+            fontWeight: "600",
+            marginBottom: 10,
+          }}
+        >
+          Ticket Type
+        </Text>
+
+        <View
+          style={{
+            flexDirection: "row",
+            marginBottom: 20,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() =>
+              setTicketType("Checklist")
+            }
+            style={{
+              flex: 1,
+              padding: 14,
+              borderRadius: 10,
+              backgroundColor:
+                ticketType === "Checklist"
+                  ? "#4f46e5"
+                  : "#f3f4f6",
+              marginRight: 8,
+            }}
+          >
+            <Text
+              style={{
+                color:
+                  ticketType === "Checklist"
+                    ? "#fff"
+                    : "#000",
+                textAlign: "center",
+              }}
+            >
+              Checklist
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() =>
+              setTicketType("Other")
+            }
+            style={{
+              flex: 1,
+              padding: 14,
+              borderRadius: 10,
+              backgroundColor:
+                ticketType === "Other"
+                  ? "#4f46e5"
+                  : "#f3f4f6",
+            }}
+          >
+            <Text
+              style={{
+                color:
+                  ticketType === "Other"
+                    ? "#fff"
+                    : "#000",
+                textAlign: "center",
+              }}
+            >
+              Other
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {/* new */}
+        {ticketType === "Checklist" && (
+        <>
+          <Text
+            style={{
+              fontWeight: "600",
+              marginBottom: 10,
+            }}
+          >
+            Select Shift
+          </Text>
+
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 20,
+            }}
+          >
+            {["09:30", "14:30", "18:30"].map((time) => (
+              <TouchableOpacity
+                key={time}
+                onPress={() => {
+                  setShift(time);
+                  setTitle(`Daily Checklist - ${time}`);
+                }}
+                style={{
+                  flex: 1,
+                  marginHorizontal: 4,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  backgroundColor:
+                    shift === time
+                      ? "#4f46e5"
+                      : "#f3f4f6",
+                }}
+              >
+                <Text
+                  style={{
+                    textAlign: "center",
+                    color:
+                      shift === time
+                        ? "#fff"
+                        : "#111827",
+                    fontWeight: "600",
+                  }}
+                >
+                  {time}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
         {/* DESCRIPTION */}
+        {ticketType === "Checklist" ? (
+        <View
+          style={{
+            marginBottom: 20,
+          }}
+        >
+          {/* Checklist mặc định */}
+          {dailyTasks.map((task) => (
+            <TouchableOpacity
+              key={task}
+              onPress={() => toggleTask(task)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 10,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 22,
+                  marginRight: 12,
+                }}
+              >
+                {checkedTasks.includes(task) ? "☑" : "☐"}
+              </Text>
+
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                }}
+              >
+                {task}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Other Task */}
+          {otherTasks.map((task, index) => (
+            <View
+              key={index}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginTop: 8,
+              }}
+            >
+              <TextInput
+                value={task}
+                onChangeText={(text) =>
+                  updateOtherTask(index, text)
+                }
+                placeholder={`Other Note ${index + 1}`}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: "#d1d5db",
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  backgroundColor: "#fff",
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={() => removeOtherTask(index)}
+                style={{
+                  marginLeft: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#ef4444",
+                    fontSize: 22,
+                    fontWeight: "bold",
+                  }}
+                >
+                  ✕
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          {/* Add Other */}
+          <TouchableOpacity
+            onPress={addOtherTask}
+            style={{
+              marginTop: 15,
+              alignSelf: "flex-start",
+            }}
+          >
+            <Text
+              style={{
+                color: "#2563eb",
+                fontSize: 15,
+                fontWeight: "700",
+              }}
+            >
+              ➕ Add Note
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
         <TextInput
           placeholder="Description"
           value={description}
@@ -278,6 +596,7 @@ export default function Create() {
             marginBottom: 16,
           }}
         />
+      )}
 
         {/* REQUESTER */}
         <TouchableOpacity
@@ -562,7 +881,7 @@ export default function Create() {
             </Text>
           )}
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* REQUESTER MODAL */}
       <Modal

@@ -2,7 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePosts } from "@/hooks/usePosts";
 import "@/styles/modal.css";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -35,6 +35,8 @@ export default function Tickets() {
   const [search, setSearch] = useState("");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const ITEMS_PER_PAGE = 50;
+  const [page, setPage] = useState(1);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,10 +44,76 @@ export default function Tickets() {
     }, [])
   );
 
-  const filteredData =
-    filter === "All"
-      ? posts
-      : posts.filter((item) => item.status === filter);
+  useEffect(() => {
+    setPage(1);
+}, [filter, timeFilter, search]);
+  
+  const filteredPosts = posts
+  // STATUS FILTER
+  .filter((item) => {
+    if (filter === "My Ticket") {
+      return item.user_id === user?.id;
+    }
+
+    if (
+      filter !== "All" &&
+      filter !== "My Ticket"
+    ) {
+      return item.status === filter;
+    }
+
+    return true;
+  })
+
+  // TIME FILTER
+  .filter((item) => {
+    const created = new Date(item.created_at);
+    const now = new Date();
+
+    if (timeFilter === "Today") {
+      return created.toDateString() === now.toDateString();
+    }
+
+    if (timeFilter === "This Week") {
+      const start = new Date();
+      start.setDate(now.getDate() - 7);
+      return created >= start;
+    }
+
+    if (timeFilter === "This Month") {
+      return (
+        created.getMonth() === now.getMonth() &&
+        created.getFullYear() === now.getFullYear()
+      );
+    }
+
+    if (timeFilter === "This Year") {
+      return created.getFullYear() === now.getFullYear();
+    }
+
+    return true;
+  })
+
+  // SEARCH
+  .filter((item) => {
+    if (!search.trim()) return true;
+
+    const keyword = search.toLowerCase();
+
+    return (
+      item.title?.toLowerCase().includes(keyword) ||
+      item.profiles?.name?.toLowerCase().includes(keyword)
+    );
+  });
+  
+  const totalPages = Math.ceil(
+    filteredPosts.length / ITEMS_PER_PAGE
+  );
+  
+  const paginatedPosts = filteredPosts.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE
+  );
 
   const getStatusColor = (status: string) => {
     if (status === "Pending") return "#f59e0b";
@@ -504,76 +572,7 @@ export default function Tickets() {
           <Text style={{ color: "#666" }}>Loading...</Text>
         ) : (
           <FlatList
-          data={posts
-            // STATUS FILTER
-            .filter((item) => {
-              if (filter === "My Ticket") {
-                return item.user_id === user?.id;
-              }
-          
-              if (
-                filter !== "All" &&
-                filter !== "My Ticket"
-              ) {
-                return item.status === filter;
-              }
-          
-              return true;
-            })
-          
-            // TIME FILTER
-            .filter((item) => {
-              const created = new Date(item.created_at);
-              const now = new Date();
-          
-              if (timeFilter === "Today") {
-                return (
-                  created.toDateString() ===
-                  now.toDateString()
-                );
-              }
-          
-              if (timeFilter === "This Week") {
-                const start = new Date();
-                start.setDate(now.getDate() - 7);
-          
-                return created >= start;
-              }
-          
-              if (timeFilter === "This Month") {
-                return (
-                  created.getMonth() === now.getMonth() &&
-                  created.getFullYear() ===
-                    now.getFullYear()
-                );
-              }
-          
-              if (timeFilter === "This Year") {
-                return (
-                  created.getFullYear() ===
-                  now.getFullYear()
-                );
-              }
-          
-              return true;
-            })
-          
-            // SEARCH FILTER
-            .filter((item) => {
-              if (!search.trim()) return true;
-            
-              const keyword = search.toLowerCase();
-            
-              const titleMatch = item.title
-                ?.toLowerCase()
-                .includes(keyword);
-            
-              const userMatch = item.profiles?.name
-                ?.toLowerCase()
-                .includes(keyword);
-            
-              return titleMatch || userMatch;
-            })}
+            data={paginatedPosts}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 30 }}
@@ -693,6 +692,58 @@ export default function Tickets() {
 
           />
         )}
+        {totalPages > 1 && (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginTop: 16,
+          }}
+        >
+          <TouchableOpacity
+            disabled={page === 1}
+            onPress={() => setPage(page - 1)}
+            style={{
+              backgroundColor:
+                page === 1 ? "#d1d5db" : "#4f46e5",
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: "#fff" }}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          <Text
+            style={{
+              fontWeight: "bold",
+            }}
+          >
+            {page} / {totalPages}
+          </Text>
+
+          <TouchableOpacity
+            disabled={page === totalPages}
+            onPress={() => setPage(page + 1)}
+            style={{
+              backgroundColor:
+                page === totalPages
+                  ? "#d1d5db"
+                  : "#4f46e5",
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: "#fff" }}>
+              Next
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       </View>
 
 
