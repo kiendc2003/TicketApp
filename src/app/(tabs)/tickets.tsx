@@ -578,7 +578,6 @@ export default function Tickets() {
             contentContainerStyle={{ paddingBottom: 30 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                onPress={() => handleChangeStatus(item)}
                 style={{
                   backgroundColor: "#f9fafb",
                   padding: 16,

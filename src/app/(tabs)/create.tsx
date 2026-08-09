@@ -71,6 +71,10 @@ export default function Create() {
 
   const [shift, setShift] = useState("");
 
+  const [showRating, setShowRating] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [createdPostId, setCreatedPostId] = useState<string | null>(null);
+
   const dailyTasks = [
     "Màn hình LED (up quảng cáo mới)",
     "Màn hình chỉ dẫn",
@@ -92,6 +96,58 @@ export default function Create() {
   useEffect(() => {
     loadRequesters();
   }, []);
+
+  const submitRating = async () => {
+    if (!rating || !createdPostId) {
+      Alert.alert(
+        "Error",
+        "Please select a rating."
+      );
+      return;
+    }
+  
+    try {
+      const { error } = await supabase
+        .from("posts")
+        .update({
+          rating: rating,
+        })
+        .eq("id", createdPostId);
+  
+      if (error) throw error;
+  
+      setShowRating(false);
+  
+      Alert.alert(
+        "Thank you!",
+        `You rated this ticket ${rating}/5 stars.`
+      );
+  
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setRequester("");
+      setWorkTime(null);
+      setIsCompleted(false);
+      setTicketType("Other");
+      setCheckedTasks([]);
+  
+      // Reset rating
+      setRating(0);
+      setCreatedPostId(null);
+  
+      await loadRequesters();
+  
+      router.replace("/");
+    } catch (error: any) {
+      console.error("Rating Error:", error);
+  
+      Alert.alert(
+        "Error",
+        error.message || "Failed to save rating."
+      );
+    }
+  };
 
   const addOtherTask = () => {
     setOtherTasks([...otherTasks, ""]);
@@ -243,7 +299,7 @@ export default function Create() {
         ].join("\n");
       }
   
-      await createPost(
+      const postId = await createPost(
         title,
         finalDescription,
         isCompleted && workTime
@@ -252,13 +308,12 @@ export default function Create() {
         requester,
         requesterId
       );
-  
-      Alert.alert(
-        "Success",
-        "Ticket created!"
-      );
+      
+      setCreatedPostId(postId);
+      setShowRating(true);
   
       // Reset form
+      
       setTitle("");
       setDescription("");
       setRequester("");
@@ -272,7 +327,7 @@ export default function Create() {
   
       await loadRequesters();
   
-      router.replace("/");
+      // router.replace("/");
     } catch (error: any) {
       console.error(
         "Create Ticket Error:",
@@ -313,6 +368,7 @@ export default function Create() {
         : [...prev, task]
     );
   };
+
 
   return (
     <SafeAreaView
@@ -1080,6 +1136,334 @@ export default function Create() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* RATING MODAL */}
+      <Modal
+        visible={showRating}
+        transparent
+        animationType="fade"
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(15, 23, 42, 0.55)",
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 20,
+          }}
+        >
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 440,
+              backgroundColor: "#ffffff",
+              borderRadius: 28,
+              padding: 28,
+              alignItems: "center",
+
+              shadowColor: "#000",
+              shadowOffset: {
+                width: 0,
+                height: 15,
+              },
+              shadowOpacity: 0.2,
+              shadowRadius: 30,
+              elevation: 15,
+            }}
+          >
+
+            {/* CLOSE */}
+            <TouchableOpacity
+              onPress={() => {
+                setShowRating(false);
+                setRating(0);
+              }}
+              activeOpacity={0.7}
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: "#f3f4f6",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: "#6b7280",
+                  fontWeight: "600",
+                }}
+              >
+                ×
+              </Text>
+            </TouchableOpacity>
+
+            {/* ICON */}
+            <View
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 38,
+                backgroundColor: "#fff7ed",
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 4,
+                marginBottom: 18,
+
+                borderWidth: 1,
+                borderColor: "#fed7aa",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 38,
+                }}
+              >
+                ⭐
+              </Text>
+            </View>
+
+            {/* TITLE */}
+            <Text
+              style={{
+                fontSize: 23,
+                fontWeight: "800",
+                color: "#111827",
+                textAlign: "center",
+                marginBottom: 8,
+              }}
+            >
+              How was your experience?
+            </Text>
+
+            {/* SUBTITLE */}
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#6b7280",
+                textAlign: "center",
+                lineHeight: 21,
+                maxWidth: 330,
+                marginBottom: 24,
+              }}
+            >
+              Your feedback helps us improve our service
+              and provide better support.
+            </Text>
+
+            {/* RATING BOX */}
+            <View
+              style={{
+                width: "100%",
+                backgroundColor: "#f8fafc",
+                borderRadius: 20,
+                paddingVertical: 18,
+                paddingHorizontal: 10,
+                alignItems: "center",
+                marginBottom: 16,
+
+                borderWidth: 1,
+                borderColor: "#f1f5f9",
+              }}
+            >
+
+              {/* STARS */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const selected =
+                    rating > 0 && star <= rating;
+
+                  return (
+                    <TouchableOpacity
+                      key={star}
+                      activeOpacity={0.65}
+                      onPress={() => setRating(star)}
+                      style={{
+                        width: 54,
+                        height: 54,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 42,
+                          color: selected
+                            ? "#fbbf24"
+                            : "#cbd5e1",
+
+                          textShadowColor: selected
+                            ? "rgba(251, 191, 36, 0.25)"
+                            : "transparent",
+
+                          textShadowOffset: {
+                            width: 0,
+                            height: 2,
+                          },
+
+                          textShadowRadius: 4,
+                        }}
+                      >
+                        {selected ? "★" : "☆"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* SCORE */}
+              <View
+                style={{
+                  height: 32,
+                  marginTop: 4,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {rating > 0 ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 20,
+                        fontWeight: "800",
+                        color: "#f59e0b",
+                      }}
+                    >
+                      {rating}
+                    </Text>
+
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: "#9ca3af",
+                        marginLeft: 4,
+                      }}
+                    >
+                      / 5
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#94a3b8",
+                    }}
+                  >
+                    Tap a star to rate
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* RATING MESSAGE */}
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: "700",
+                color: rating
+                  ? "#374151"
+                  : "#94a3b8",
+                marginBottom: 22,
+                textAlign: "center",
+              }}
+            >
+              {rating === 1 &&
+                "We're sorry to hear that 😔"}
+
+              {rating === 2 &&
+                "We'll try to do better 😕"}
+
+              {rating === 3 &&
+                "Thank you for your feedback 🙂"}
+
+              {rating === 4 &&
+                "Glad you had a good experience! 😊"}
+
+              {rating === 5 &&
+                "That's wonderful! Thank you! 🎉"}
+
+              {!rating &&
+                "How would you rate our service?"}
+            </Text>
+
+            {/* SUBMIT BUTTON */}
+            <TouchableOpacity
+              onPress={submitRating}
+              disabled={!rating}
+              activeOpacity={0.8}
+              style={{
+                width: "100%",
+                height: 52,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "center",
+
+                backgroundColor: rating
+                  ? "#4f46e5"
+                  : "#e2e8f0",
+
+                shadowColor: rating
+                  ? "#4f46e5"
+                  : "transparent",
+
+                shadowOffset: {
+                  width: 0,
+                  height: 5,
+                },
+
+                shadowOpacity: rating
+                  ? 0.2
+                  : 0,
+
+                shadowRadius: 10,
+                elevation: rating ? 4 : 0,
+              }}
+            >
+              <Text
+                style={{
+                  color: rating
+                    ? "#ffffff"
+                    : "#94a3b8",
+                  fontSize: 15,
+                  fontWeight: "800",
+                }}
+              >
+                {rating
+                  ? "Submit Rating"
+                  : "Select a rating"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* FOOTER */}
+            <Text
+              style={{
+                fontSize: 11,
+                color: "#9ca3af",
+                marginTop: 14,
+                textAlign: "center",
+              }}
+            >
+              Your feedback is greatly appreciated.
+            </Text>
+
           </View>
         </View>
       </Modal>

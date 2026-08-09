@@ -174,13 +174,11 @@ export const usePosts = () => {
     requesterId?: string
   ) => {
     if (!user) {
-      throw new Error(
-        "User not authenticated"
-      );
+      throw new Error("User not authenticated");
     }
   
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("posts")
         .insert({
           user_id: user.id,
@@ -202,11 +200,18 @@ export const usePosts = () => {
   
           requester_id:
             requesterId || null,
-        });
+  
+          rating: null,
+        })
+        .select("id")
+        .single();
   
       if (error) throw error;
   
       await loadPosts();
+  
+      return data.id;
+  
     } catch (error) {
       console.error(
         "Error in createPost:",
