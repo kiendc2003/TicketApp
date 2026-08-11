@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Dimensions,
   FlatList,
-  Platform,
   Text,
   TouchableOpacity,
   View
@@ -341,6 +340,7 @@ export default function Home() {
             {/* CHART CARD */}
             <View
               style={{
+                width: "100%",
                 backgroundColor: "#f9fafb",
                 borderRadius: 18,
                 paddingVertical: 16,
@@ -348,6 +348,7 @@ export default function Home() {
                 alignItems: "center",
                 borderWidth: 1,
                 borderColor: "#eef0f2",
+                overflow: "hidden",
               }}
             >
               <LineChart
@@ -359,13 +360,8 @@ export default function Home() {
                     },
                   ],
                 }}
-                width={
-                  Platform.OS === "web"
-                    ? 700
-                    : screenWidth - 40
-                }
+                width={Math.min(screenWidth - 40, 700)}
                 height={220}
-
                 fromZero
                 fromNumber={chartMax}
                 segments={segments}
