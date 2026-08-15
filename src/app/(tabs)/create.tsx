@@ -3,13 +3,9 @@ import "@/styles/datepicker.css";
 
 import { supabase } from "@/lib/supabase/client";
 
-import DateTimePicker from "@react-native-community/datetimepicker";
-
 import { useRouter } from "expo-router";
 
 import { useEffect, useState } from "react";
-
-import DatePicker from "react-datepicker";
 
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -18,12 +14,11 @@ import {
   Alert,
   FlatList,
   Modal,
-  Platform,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -75,18 +70,12 @@ export default function Create() {
   const [rating, setRating] = useState(0);
   const [createdPostId, setCreatedPostId] = useState<string | null>(null);
 
-  const dailyTasks = [
-    "Màn hình LED (up quảng cáo mới)",
-    "Màn hình chỉ dẫn",
-    "Đếm người",
-    "Bãi xe (kiểm tra)",
-    "Bãi xe (lấy báo cáo hoá đơn, doanh thu)",
-    "Đầu ghi camera",
-    "Kiểm tra tình hình server, đường truyền, virus",
-  ];
+  const [catalogs, setCatalogs] = useState<any[]>([]);
+  const [checklists, setChecklists] = useState<any[]>([]);
+  const [selectedCatalog, setSelectedCatalog] = useState("");
 
   const [checkedTasks, setCheckedTasks] =
-  useState<string[]>([]);
+  useState<any[]>([]);
 
   const { createPost } = usePosts();
 
@@ -95,7 +84,116 @@ export default function Create() {
   // LOAD REQUESTERS
   useEffect(() => {
     loadRequesters();
+    loadChecklistData();
   }, []);
+
+  const formatChecklistTitle = (shiftTime: string) => {
+    const now = new Date();
+  
+    const day = now
+      .getDate()
+      .toString()
+      .padStart(2, "0");
+  
+    const month = (now.getMonth() + 1)
+      .toString()
+      .padStart(2, "0");
+  
+    const year = now.getFullYear();
+  
+    return `Daily Checklist ${shiftTime} ${day}/${month}/${year}`;
+  };
+
+  const loadChecklistData = async () => {
+    try {
+      // LOAD CATALOGS
+      const {
+        data: catalogData,
+        error: catalogError,
+      } = await supabase
+        .from("catalogs")
+        .select("*")
+        .order("id", {
+          ascending: true,
+        });
+  
+      if (catalogError) {
+        throw catalogError;
+      }
+  
+      // LOAD CHECKLISTS + CATALOG
+      const {
+        data: checklistData,
+        error: checklistError,
+      } = await supabase
+        .from("checklists")
+        .select(`
+          id,
+          name,
+          catalog_id,
+          catalogs (
+            id,
+            name
+          )
+        `)
+        .order("id", {
+          ascending: true,
+        });
+  
+      if (checklistError) {
+        throw checklistError;
+      }
+  
+      // FORMAT CHECKLIST
+      const formattedChecklist =
+        (checklistData || []).map(
+          (item: any) => ({
+            id: item.id,
+  
+            name: item.name,
+  
+            catalog_id:
+              item.catalog_id,
+  
+            catalog_name:
+              item.catalogs?.name ||
+              "Other",
+  
+            // Default khi tạo checklist
+            status: "OK",
+  
+            note: "",
+          })
+        );
+  
+      console.log(
+        "CHECKLIST FORMATTED:",
+        JSON.stringify(
+          formattedChecklist,
+          null,
+          2
+        )
+      );
+  
+      setCatalogs(
+        catalogData || []
+      );
+  
+      setChecklists(
+        formattedChecklist
+      );
+  
+    } catch (error) {
+      console.error(
+        "Load checklist error:",
+        JSON.stringify(
+          error,
+          null,
+          2
+        )
+      );
+    }
+  };
 
   const submitRating = async () => {
     if (!rating || !createdPostId) {
@@ -235,8 +333,11 @@ export default function Create() {
       return;
     }
   
-    if (!requester.trim()) {
-      Alert.alert("Error", "Requester is required");
+    if (ticketType === "Other" && !requester.trim()) {
+      Alert.alert(
+        "Error",
+        "Please select a requester."
+      );
       return;
     }
   
@@ -280,33 +381,21 @@ export default function Create() {
   
     try {
       const requesterId =
-        await handleRequester();
-  
-      let finalDescription = description;
-  
-      if (ticketType === "Checklist") {
-        finalDescription = [
-          ...checkedTasks.map(
-            (item) => `• ${item}`
-          ),
-          ...otherTasks
-            .filter(
-              (item) => item.trim() !== ""
-            )
-            .map(
-              (item) => `📝 Note: ${item}`
-            ),
-        ].join("\n");
-      }
+        ticketType === "Other"
+          ? await handleRequester()
+          : undefined;
+
+      const completionTime = new Date();
   
       const postId = await createPost(
         title,
-        finalDescription,
-        isCompleted && workTime
-          ? workTime.toISOString()
-          : undefined,
+        ticketType === "Checklist" ? undefined : description,
+        completionTime.toISOString(),
         requester,
-        requesterId
+        requesterId,
+        ticketType === "Checklist"
+          ? checkedTasks
+          : undefined
       );
       
       setCreatedPostId(postId);
@@ -361,12 +450,30 @@ export default function Create() {
     });
   };
 
-  const toggleTask = (task: string) => {
-    setCheckedTasks((prev) =>
-      prev.includes(task)
-        ? prev.filter((i) => i !== task)
-        : [...prev, task]
-    );
+  const toggleTask = (item: any) => {
+    setCheckedTasks((prev) => {
+      const exists = prev.find(
+        (task) => task.id === item.id
+      );
+  
+      if (exists) {
+        return prev.filter(
+          (task) => task.id !== item.id
+        );
+      }
+  
+      return [
+        ...prev,
+        {
+          id: item.id,
+          catalog_id: item.catalog_id,
+          catalog_name: item.catalog_name,
+          name: item.name,
+          status: "OK",
+          note: "",
+        },
+      ];
+    });
   };
 
 
@@ -504,7 +611,9 @@ export default function Create() {
                 key={time}
                 onPress={() => {
                   setShift(time);
-                  setTitle(`Daily Checklist - ${time}`);
+                  setTitle(
+                    formatChecklistTitle(time)
+                  );
                 }}
                 style={{
                   flex: 1,
@@ -536,108 +645,221 @@ export default function Create() {
       )}
         {/* DESCRIPTION */}
         {ticketType === "Checklist" ? (
-        <View
-          style={{
-            marginBottom: 20,
-          }}
-        >
-          {/* Checklist mặc định */}
-          {dailyTasks.map((task) => (
-            <TouchableOpacity
-              key={task}
-              onPress={() => toggleTask(task)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 10,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 22,
-                  marginRight: 12,
-                }}
-              >
-                {checkedTasks.includes(task) ? "☑" : "☐"}
-              </Text>
+        <View style={{ marginBottom: 20 }}>
 
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: 15,
-                }}
-              >
-                {task}
-              </Text>
-            </TouchableOpacity>
-          ))}
+            {/* CATALOG */}
+            {catalogs.map((catalog) => {
 
-          {/* Other Task */}
-          {otherTasks.map((task, index) => (
-            <View
-              key={index}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginTop: 8,
-              }}
-            >
-              <TextInput
-                value={task}
-                onChangeText={(text) =>
-                  updateOtherTask(index, text)
-                }
-                placeholder={`Other Note ${index + 1}`}
-                style={{
-                  flex: 1,
-                  borderWidth: 1,
-                  borderColor: "#d1d5db",
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  backgroundColor: "#fff",
-                }}
-              />
+              const catalogItems = checklists.filter(
+                (item) =>
+                  item.catalog_id === catalog.id
+              );
 
-              <TouchableOpacity
-                onPress={() => removeOtherTask(index)}
-                style={{
-                  marginLeft: 10,
-                }}
-              >
-                <Text
+              if (catalogItems.length === 0) {
+                return null;
+              }
+
+              return (
+                <View
+                  key={catalog.id}
                   style={{
-                    color: "#ef4444",
-                    fontSize: 22,
-                    fontWeight: "bold",
+                    marginBottom: 20,
                   }}
                 >
-                  ✕
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
 
-          {/* Add Other */}
-          <TouchableOpacity
-            onPress={addOtherTask}
-            style={{
-              marginTop: 15,
-              alignSelf: "flex-start",
-            }}
-          >
-            <Text
-              style={{
-                color: "#2563eb",
-                fontSize: 15,
-                fontWeight: "700",
-              }}
-            >
-              ➕ Add Note
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
+                  {/* CATALOG TITLE */}
+                  <Text
+                    style={{
+                      fontSize: 17,
+                      fontWeight: "700",
+                      marginBottom: 8,
+                      color: "#111827",
+                    }}
+                  >
+                    {catalog.name}
+                  </Text>
+
+                  {/* CHECKLIST */}
+                  {catalogItems.map((item) => {
+
+                    const selected = checkedTasks.find(
+                      (task) => task.id === item.id
+                    );
+
+                    return (
+                      <View
+                        key={item.id}
+                        style={{
+                          marginBottom: 10,
+                          backgroundColor: "#f9fafb",
+                          borderRadius: 12,
+                          padding: 12,
+                        }}
+                      >
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            toggleTask(item)
+                          }
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                          }}
+                        >
+
+                          <Text
+                            style={{
+                              fontSize: 22,
+                              marginRight: 12,
+                            }}
+                          >
+                            {selected ? "☑" : "☐"}
+                          </Text>
+
+                          <Text
+                            style={{
+                              flex: 1,
+                              fontSize: 15,
+                            }}
+                          >
+                            {item.name}
+                          </Text>
+
+                        </TouchableOpacity>
+
+                        {/* DETAIL */}
+                        {selected && (
+                          <View
+                            style={{
+                              marginTop: 10,
+                              marginLeft: 34,
+                            }}
+                          >
+
+                            {/* STATUS */}
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                gap: 8,
+                              }}
+                            >
+
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setCheckedTasks((prev) =>
+                                    prev.map((task) =>
+                                      task.id === item.id
+                                        ? {
+                                            ...task,
+                                            status: "OK",
+                                          }
+                                        : task
+                                    )
+                                  );
+                                }}
+                                style={{
+                                  paddingHorizontal: 14,
+                                  paddingVertical: 7,
+                                  borderRadius: 8,
+                                  backgroundColor:
+                                    selected.status === "OK"
+                                      ? "#22c55e"
+                                      : "#e5e7eb",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color:
+                                      selected.status === "OK"
+                                        ? "#fff"
+                                        : "#374151",
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  ✓ OK
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setCheckedTasks((prev) =>
+                                    prev.map((task) =>
+                                      task.id === item.id
+                                        ? {
+                                            ...task,
+                                            status: "NOT OK",
+                                          }
+                                        : task
+                                    )
+                                  );
+                                }}
+                                style={{
+                                  paddingHorizontal: 14,
+                                  paddingVertical: 7,
+                                  borderRadius: 8,
+                                  backgroundColor:
+                                    selected.status === "NOT OK"
+                                      ? "#ef4444"
+                                      : "#e5e7eb",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color:
+                                      selected.status === "NOT OK"
+                                        ? "#fff"
+                                        : "#374151",
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  ✕ Not OK
+                                </Text>
+                              </TouchableOpacity>
+
+                            </View>
+
+                            {/* NOTE */}
+                            <TextInput
+                              placeholder="Note..."
+                              value={selected.note}
+                              onChangeText={(text) => {
+                                setCheckedTasks((prev) =>
+                                  prev.map((task) =>
+                                    task.id === item.id
+                                      ? {
+                                          ...task,
+                                          note: text,
+                                        }
+                                      : task
+                                  )
+                                );
+                              }}
+                              multiline
+                              style={{
+                                marginTop: 10,
+                                backgroundColor: "#fff",
+                                borderWidth: 1,
+                                borderColor: "#e5e7eb",
+                                borderRadius: 10,
+                                padding: 10,
+                                minHeight: 70,
+                                textAlignVertical: "top",
+                              }}
+                            />
+
+                          </View>
+                        )}
+
+                      </View>
+                    );
+                  })}
+
+                </View>
+              );
+            })}
+
+          </View>
+        ) : (
         <TextInput
           placeholder="Description"
           value={description}
@@ -654,7 +876,7 @@ export default function Create() {
         />
       )}
 
-        {/* REQUESTER */}
+      {ticketType === "Other" && (
         <TouchableOpacity
           onPress={() =>
             setShowRequesterBox(true)
@@ -673,243 +895,10 @@ export default function Create() {
                 : "#9ca3af",
             }}
           >
-            {requester ||
-              "👤 Select requester"}
+            {requester || "👤 Select requester"}
           </Text>
         </TouchableOpacity>
-
-        {/* COMPLETED TOGGLE */}
-        <TouchableOpacity
-          onPress={() => {
-            setIsCompleted(
-              !isCompleted
-            );
-
-            if (isCompleted) {
-              setWorkTime(null);
-            }
-          }}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <View
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 6,
-              borderWidth: 2,
-              borderColor: isCompleted
-                ? "#4f46e5"
-                : "#cbd5e1",
-              backgroundColor:
-                isCompleted
-                  ? "#4f46e5"
-                  : "#fff",
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 10,
-            }}
-          >
-            {isCompleted && (
-              <Text
-                style={{
-                  color: "#fff",
-                  fontWeight: "700",
-                  fontSize: 12,
-                }}
-              >
-                ✓
-              </Text>
-            )}
-          </View>
-
-          <Text
-            style={{
-              fontSize: 15,
-              fontWeight: "500",
-              color: "#111827",
-            }}
-          >
-            Mark as completed
-          </Text>
-        </TouchableOpacity>
-
-        {/* ONLY SHOW WHEN COMPLETED */}
-        {isCompleted && (
-          <>
-            {/* WEB */}
-            {Platform.OS === "web" ? (
-              <View
-                style={{
-                  marginBottom: 24,
-                  zIndex: 9999,
-                  position: "relative",
-                }}
-              >
-                <View
-                  style={{
-                    backgroundColor:
-                      "#f9fafb",
-                    borderRadius: 18,
-                    padding: 16,
-                    borderWidth: 1,
-                    borderColor:
-                      "#eef0f2",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: "#6b7280",
-                      marginBottom: 8,
-                      fontWeight: "500",
-                    }}
-                  >
-                    Completion Time
-                  </Text>
-
-                  <DatePicker
-                    selected={workTime}
-                    onChange={(
-                      date: Date | null
-                    ) =>
-                      setWorkTime(date)
-                    }
-                    showTimeSelect
-                    timeFormat="HH:mm"
-                    timeIntervals={15}
-                    dateFormat="dd/MM/yyyy HH:mm"
-                    placeholderText="📅 Select completion time"
-                    className="custom-datepicker"
-                    withPortal
-                  />
-
-                  <Text
-                    style={{
-                      marginTop: 10,
-                      fontSize: 12,
-                      color: "#9ca3af",
-                    }}
-                  >
-                    Ticket will
-                    automatically be
-                    closed.
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <>
-                {/* MOBILE BUTTON */}
-                <TouchableOpacity
-                  onPress={() =>
-                    setShowPicker(true)
-                  }
-                  style={{
-                    backgroundColor:
-                      "#f5f5f5",
-                    padding: 14,
-                    borderRadius: 10,
-                    marginBottom: 12,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: workTime
-                        ? "#000"
-                        : "#9ca3af",
-                    }}
-                  >
-                    {workTime
-                      ? formatDate(
-                          workTime
-                        )
-                      : "Select completion time"}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* MOBILE PICKER */}
-                <Modal
-                  visible={showPicker}
-                  transparent
-                  animationType="slide"
-                >
-                  <View
-                    style={{
-                      flex: 1,
-                      justifyContent:
-                        "flex-end",
-                      backgroundColor:
-                        "rgba(0,0,0,0.3)",
-                    }}
-                  >
-                    <View
-                      style={{
-                        backgroundColor:
-                          "#fff",
-                        padding: 16,
-                        borderTopLeftRadius: 20,
-                        borderTopRightRadius: 20,
-                      }}
-                    >
-                      <DateTimePicker
-                        value={
-                          workTime ||
-                          new Date()
-                        }
-                        mode="datetime"
-                        display="spinner"
-                        style={{
-                          height: 200,
-                        }}
-                        onChange={(
-                          event,
-                          selectedDate
-                        ) => {
-                          if (
-                            selectedDate
-                          ) {
-                            setWorkTime(
-                              selectedDate
-                            );
-                          }
-                        }}
-                      />
-
-                      <TouchableOpacity
-                        onPress={() =>
-                          setShowPicker(
-                            false
-                          )
-                        }
-                        style={{
-                          marginTop: 10,
-                          backgroundColor:
-                            "#4f46e5",
-                          padding: 12,
-                          borderRadius: 10,
-                          alignItems:
-                            "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              "#fff",
-                          }}
-                        >
-                          Done
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </Modal>
-              </>
-            )}
-          </>
-        )}
+      )}
 
         {/* SUBMIT */}
         <TouchableOpacity

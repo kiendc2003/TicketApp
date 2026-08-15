@@ -21,11 +21,17 @@ export interface Post {
 
   profiles?: PostUser;
 
-  status: string;
-
   work_time?: string;
 
   requester?: string;
+
+  checklist?: {
+    id?: string | number;
+    name: string;
+    catalog_name?: string;
+    status?: "OK" | "Not OK";
+    note?: string;
+  }[] | null;
 }
 
 export interface Requester {
@@ -171,7 +177,8 @@ export const usePosts = () => {
     description?: string,
     workTime?: string,
     requester?: string,
-    requesterId?: string
+    requesterId?: string,
+    checklist?: any[]
   ) => {
     if (!user) {
       throw new Error("User not authenticated");
@@ -202,6 +209,8 @@ export const usePosts = () => {
             requesterId || null,
   
           rating: null,
+
+          checklist: checklist || null,
         })
         .select("id")
         .single();
@@ -223,48 +232,7 @@ export const usePosts = () => {
   };
 
   // UPDATE STATUS
-  const updatePostStatus = async (
-    postId: string,
-    status: string
-  ) => {
-    try {
-      const currentPost = posts.find(
-        (item) => item.id === postId
-      );
   
-      // BLOCK CLOSED -> PENDING
-      if (
-        currentPost?.status === "Closed" &&
-        status === "Pending"
-      ) {
-        return;
-      }
-  
-      const updateData: any = {
-        status,
-      };
-  
-      // 🔥 nếu close thì lấy thời gian hiện tại
-      if (status === "Closed") {
-        updateData.work_time =
-          new Date().toISOString();
-      }
-  
-      const { error } = await supabase
-        .from("posts")
-        .update(updateData)
-        .eq("id", postId);
-  
-      if (error) throw error;
-  
-      await loadPosts();
-    } catch (error) {
-      console.error(
-        "Error updating status:",
-        error
-      );
-    }
-  };
 
   return {
     posts,
@@ -278,8 +246,6 @@ export const usePosts = () => {
     loadPosts,
 
     loadRequesters,
-
-    updatePostStatus,
 
     refetch: loadPosts,
   };
