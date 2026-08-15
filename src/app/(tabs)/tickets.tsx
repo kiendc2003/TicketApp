@@ -568,9 +568,6 @@ const exportChecklistPDF = async (item: any) => {
 
             </div>
 
-
-            
-
           </div>
 
 

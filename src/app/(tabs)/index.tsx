@@ -1442,7 +1442,7 @@ export default function Home() {
                       marginTop: 3,
                     }}
                   >
-                    {item.user_name || "Unknown User"} • {createdTime}
+                    {item.profiles?.name || "Unknown User"} • {createdTime}
                   </Text>
                 </View>
   
