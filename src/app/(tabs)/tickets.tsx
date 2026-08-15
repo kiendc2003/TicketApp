@@ -648,43 +648,53 @@ const exportChecklistPDF = async (item: any) => {
     console.log("Platform:", Platform.OS);
 
     if (Platform.OS === "web") {
+      const printUrl = URL.createObjectURL(
+        new Blob([html], {
+          type: "text/html;charset=utf-8",
+        })
+      );
+
       const printWindow = window.open(
-        "",
+        printUrl,
         "_blank"
       );
-    
+
       if (!printWindow) {
+        URL.revokeObjectURL(printUrl);
         Alert.alert(
           "Popup Blocked",
           "Please allow pop-ups for this website."
         );
         return;
       }
-    
-      printWindow.document.open();
-    
-      printWindow.document.write(html);
-    
-      printWindow.document.close();
-    
-      // Đổi tên trang thay vì about:blank
-      printWindow.document.title =
-        "CheckList Report";
-    
+
+      const runPrint = () => {
+        printWindow.document.title =
+          "CheckList Report";
+
         try {
           console.log("CALLING PRINT");
-        
+
           printWindow.focus();
-        
+
           console.log("FOCUS DONE");
-        
+
           printWindow.print();
-        
+
           console.log("PRINT DONE");
         } catch (error) {
           console.error("PRINT ERROR:", error);
+        } finally {
+          URL.revokeObjectURL(printUrl);
         }
-    
+      };
+
+      if (printWindow.document.readyState === "complete") {
+        runPrint();
+      } else {
+        printWindow.onload = runPrint;
+      }
+
       return;
     }
 
