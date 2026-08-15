@@ -65,6 +65,10 @@ const otherTickets = posts.filter(
 );
 
 const exportChecklistPDF = async (item: any) => {
+
+  console.log("========== EXPORT PDF START ==========");
+  console.log("PDF ITEM:", item);
+
   try {
     // ==========================================
     // 1. CHECK CHECKLIST
@@ -640,6 +644,9 @@ const exportChecklistPDF = async (item: any) => {
     // 6. WEB
     // ==========================================
 
+    console.log("========== BEFORE WEB PRINT ==========");
+    console.log("Platform:", Platform.OS);
+
     if (Platform.OS === "web") {
       const printWindow = window.open(
         "",
@@ -658,16 +665,25 @@ const exportChecklistPDF = async (item: any) => {
     
       printWindow.document.write(html);
     
-      printWindow.document.close();
+      // printWindow.document.close();
     
       // Đổi tên trang thay vì about:blank
       printWindow.document.title =
         "CheckList Report";
     
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 500);
+        try {
+          console.log("CALLING PRINT");
+        
+          printWindow.focus();
+        
+          console.log("FOCUS DONE");
+        
+          printWindow.print();
+        
+          console.log("PRINT DONE");
+        } catch (error) {
+          console.error("PRINT ERROR:", error);
+        }
     
       return;
     }
