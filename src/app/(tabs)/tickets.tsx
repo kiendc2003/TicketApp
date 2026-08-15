@@ -648,52 +648,38 @@ const exportChecklistPDF = async (item: any) => {
     console.log("Platform:", Platform.OS);
 
     if (Platform.OS === "web") {
-      const printUrl = URL.createObjectURL(
-        new Blob([html], {
-          type: "text/html;charset=utf-8",
-        })
-      );
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText =
+        "position:fixed;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+      iframe.title = "CheckList Report";
+      iframe.srcdoc = html;
 
-      const printWindow = window.open(
-        printUrl,
-        "_blank"
-      );
+      const cleanup = () => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      };
 
-      if (!printWindow) {
-        URL.revokeObjectURL(printUrl);
-        Alert.alert(
-          "Popup Blocked",
-          "Please allow pop-ups for this website."
-        );
-        return;
-      }
-
-      const runPrint = () => {
-        printWindow.document.title =
-          "CheckList Report";
-
+      iframe.onload = () => {
         try {
           console.log("CALLING PRINT");
 
-          printWindow.focus();
-
-          console.log("FOCUS DONE");
-
-          printWindow.print();
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
 
           console.log("PRINT DONE");
         } catch (error) {
           console.error("PRINT ERROR:", error);
+          Alert.alert(
+            "Export PDF Error",
+            "Failed to open print dialog."
+          );
         } finally {
-          URL.revokeObjectURL(printUrl);
+          setTimeout(cleanup, 1000);
         }
       };
 
-      if (printWindow.document.readyState === "complete") {
-        runPrint();
-      } else {
-        printWindow.onload = runPrint;
-      }
+      document.body.appendChild(iframe);
 
       return;
     }
