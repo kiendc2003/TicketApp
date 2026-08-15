@@ -665,7 +665,7 @@ const exportChecklistPDF = async (item: any) => {
     
       printWindow.document.write(html);
     
-      // printWindow.document.close();
+      printWindow.document.close();
     
       // Đổi tên trang thay vì about:blank
       printWindow.document.title =
