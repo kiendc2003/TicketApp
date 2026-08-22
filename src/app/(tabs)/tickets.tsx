@@ -4,7 +4,7 @@ import "@/styles/modal.css";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -41,6 +41,7 @@ export default function Tickets() {
   const [activeTab, setActiveTab] = useState<
     "checklist" | "other"
   >("checklist");
+  const listRef = useRef<FlatList>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,7 +51,11 @@ export default function Tickets() {
 
   useEffect(() => {
     setPage(1);
-}, [filter, timeFilter, search]);
+  }, [filter, timeFilter, search, activeTab]);
+
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [page]);
 
 const checklistTickets = posts.filter(
   (item: any) =>
@@ -795,13 +800,21 @@ const exportChecklistPDF = async (item: any) => {
     );
   });
   
+  const currentTickets =
+    activeTab === "checklist"
+      ? checklistTickets
+      : otherTickets;
+
+  const itemsPerPage =
+    activeTab === "checklist" ? 10 : 25;
+
   const totalPages = Math.ceil(
-    filteredPosts.length / ITEMS_PER_PAGE
+    currentTickets.length / itemsPerPage
   );
-  
-  const paginatedPosts = filteredPosts.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE
+
+  const paginatedTickets = currentTickets.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
   );
 
   const formatTime = (dateString: string) => {
@@ -831,50 +844,6 @@ const exportChecklistPDF = async (item: any) => {
     return `${hours}:${minutes} Ngày ${day} Tháng ${month} Năm ${year}`;
   };
 
-
-  const showPermissionModal = () => {
-    const modal = document.createElement("div");
-  
-    modal.innerHTML = `
-      <div id="overlay" class="status-overlay">
-        <div class="status-modal">
-  
-          <div class="status-title">
-            Permission Denied
-          </div>
-  
-          <p class="logout-text">
-            You can only update your own ticket.
-          </p>
-  
-          <button id="okBtn" class="status-btn closed">
-            OK
-          </button>
-  
-        </div>
-      </div>
-    `;
-  
-    document.body.appendChild(modal);
-  
-    const remove = () => {
-      if (document.body.contains(modal)) {
-        document.body.removeChild(modal);
-      }
-    };
-  
-    modal
-      .querySelector("#okBtn")
-      ?.addEventListener("click", remove);
-  
-    modal
-      .querySelector("#overlay")
-      ?.addEventListener("click", (e: any) => {
-        if (e.target.id === "overlay") {
-          remove();
-        }
-      });
-  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -1084,11 +1053,8 @@ const exportChecklistPDF = async (item: any) => {
           <Text style={{ color: "#666" }}>Loading...</Text>
         ) : (
           <FlatList
-            data={
-              activeTab === "checklist"
-                ? checklistTickets
-                : otherTickets
-            }
+            ref={listRef}
+            data={paginatedTickets}
             keyExtractor={(item) =>
               item.id.toString()
             }
@@ -1583,57 +1549,53 @@ const exportChecklistPDF = async (item: any) => {
           />
         )}
         {totalPages > 1 && (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: 16,
-          }}
-        >
-          <TouchableOpacity
-            disabled={page === 1}
-            onPress={() => setPage(page - 1)}
+          <View
             style={{
-              backgroundColor:
-                page === 1 ? "#d1d5db" : "#4f46e5",
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 10,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 16,
             }}
           >
-            <Text style={{ color: "#fff" }}>
-              Previous
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              disabled={page === 1}
+              onPress={() => setPage((prev) => prev - 1)}
+              style={{
+                backgroundColor:
+                  page === 1 ? "#d1d5db" : "#4f46e5",
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 10,
+              }}
+            >
+              <Text style={{ color: "#fff" }}>
+                Previous
+              </Text>
+            </TouchableOpacity>
 
-          <Text
-            style={{
-              fontWeight: "bold",
-            }}
-          >
-            {page} / {totalPages}
-          </Text>
-
-          <TouchableOpacity
-            disabled={page === totalPages}
-            onPress={() => setPage(page + 1)}
-            style={{
-              backgroundColor:
-                page === totalPages
-                  ? "#d1d5db"
-                  : "#4f46e5",
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 10,
-            }}
-          >
-            <Text style={{ color: "#fff" }}>
-              Next
+            <Text style={{ fontWeight: "bold" }}>
+              {page} / {totalPages}
             </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
+            <TouchableOpacity
+              disabled={page === totalPages}
+              onPress={() => setPage((prev) => prev + 1)}
+              style={{
+                backgroundColor:
+                  page === totalPages
+                    ? "#d1d5db"
+                    : "#4f46e5",
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 10,
+              }}
+            >
+              <Text style={{ color: "#fff" }}>
+                Next
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
 
